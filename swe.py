@@ -1,5 +1,6 @@
-import numpy
+import numpy.array_api as numpy
 import matplotlib.pyplot as plt
+import math
 
 # constants
 g = 9.81
@@ -61,14 +62,14 @@ dvdt = numpy.zeros_like(v)
 delevdt = numpy.zeros_like(elev)
 
 # initial condition
-elev[:] = initial_elev(x_t_2d, y_t_2d)
+elev[...] = initial_elev(x_t_2d, y_t_2d)
 
 # time step
-c = numpy.sqrt(g*h)
+c = math.sqrt(g*h)
 alpha = 0.5
 dt = alpha * dx / c
-dt = t_export / int(numpy.ceil(t_export / dt))
-nt = int(numpy.ceil(t_end / dt))
+dt = t_export / int(math.ceil(t_export / dt))
+nt = int(math.ceil(t_end / dt))
 print(f'Time step: {dt} s')
 
 
@@ -90,7 +91,7 @@ def rhs(u, v, elev):
     dvdt[:, -1] = dvdt[:, 0]
 
     # velocity divergence -h div(u)
-    delevdt[:] = -h * ((u[1:, :] - u[:-1, :])/dx + (v[:, 1:] - v[:, :-1])/dy)
+    delevdt[...] = -h * ((u[1:, :] - u[:-1, :])/dx + (v[:, 1:] - v[:, :-1])/dy)
 
 
 plt.ion()
@@ -109,27 +110,27 @@ for i in range(nt+1):
     t = i*dt
 
     if t >= next_t_export:
-        elev_max = elev.max()
+        elev_max = float(numpy.max(elev))
         print(f'{i:04d} {t:.3f} elev={elev_max:9.5f}')
         if elev_max > 1e3:
             print('Invalid elevation value')
             break
         i_export += 1
         next_t_export = i_export * t_export
-        img.update({'array': elev.ravel()})
+        img.update({'array': elev})
         fig.canvas.draw()
         fig.canvas.flush_events()
 
     # SSPRK33 time integrator
     rhs(u, v, elev)
-    u1[:] = u + dt*dudt
-    v1[:] = v + dt*dvdt
-    elev1[:] = elev + dt*delevdt
+    u1[...] = u + dt*dudt
+    v1[...] = v + dt*dvdt
+    elev1[...] = elev + dt*delevdt
     rhs(u1, v1, elev1)
-    u2[:] = 0.75*u + 0.25*(u1 + dt*dudt)
-    v2[:] = 0.75*v + 0.25*(v1 + dt*dvdt)
-    elev2[:] = 0.75*elev + 0.25*(elev1 + dt*delevdt)
+    u2[...] = 0.75*u + 0.25*(u1 + dt*dudt)
+    v2[...] = 0.75*v + 0.25*(v1 + dt*dvdt)
+    elev2[...] = 0.75*elev + 0.25*(elev1 + dt*delevdt)
     rhs(u2, v2, elev2)
-    u[:] = u/3 + 2/3*(u2 + dt*dudt)
-    v[:] = v/3 + 2/3*(v2 + dt*dvdt)
-    elev[:] = elev/3 + 2/3*(elev2 + dt*delevdt)
+    u[...] = u/3 + 2/3*(u2 + dt*dudt)
+    v[...] = v/3 + 2/3*(v2 + dt*dvdt)
+    elev[...] = elev/3 + 2/3*(elev2 + dt*delevdt)
