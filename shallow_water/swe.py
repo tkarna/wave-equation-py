@@ -7,16 +7,16 @@ g = 9.81
 h = 1.0
 
 # run time
-t_end = 2.0
-t_export = 0.05
+t_end = 1.0
+t_export = 0.02
 
 
 def initial_elev(x, y):
     """Set initial condition for water elevation"""
     amp = 0.5
-    radius = 0.1
-    x0 = -0.3
-    y0 = -0.2
+    radius = 0.3
+    x0 = 0.0
+    y0 = 0.0
     dist2 = (x - x0)**2 + (y - y0)**2
     return amp * numpy.exp(-1.0 * dist2 / radius**2)
 
@@ -147,7 +147,7 @@ def rhs(u, v, elev):
 plt.ion()
 fig, ax = plt.subplots(nrows=1, ncols=1)
 vmax = 0.2
-img = ax.pcolormesh(x_u_1d, y_v_1d, elev, vmin=-vmax, vmax=vmax, cmap='RdBu_r')
+img = ax.pcolormesh(x_u_1d, y_v_1d, elev, vmin=-vmax, vmax=vmax, cmap=plt.get_cmap('RdBu_r', 61))
 cb = plt.colorbar(img, label='Elevation')
 fig.canvas.draw()
 fig.canvas.flush_events()
@@ -184,3 +184,7 @@ for i in range(nt+1):
     u[...] = u/3 + 2/3*(u2 + dt*dudt)
     v[...] = v/3 + 2/3*(v2 + dt*dvdt)
     elev[...] = elev/3 + 2/3*(elev2 + dt*delevdt)
+
+
+plt.ioff()
+plt.show()
