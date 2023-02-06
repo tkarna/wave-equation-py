@@ -48,6 +48,10 @@ elev = numpy.zeros(T_shape, dtype=numpy.float64)
 u = numpy.zeros(U_shape, dtype=numpy.float64)
 v = numpy.zeros(V_shape, dtype=numpy.float64)
 
+# volume fluxes
+hu = numpy.zeros_like(u)
+hv = numpy.zeros_like(v)
+
 # state for RK stages
 elev1 = numpy.zeros_like(elev)
 elev2 = numpy.zeros_like(elev)
@@ -90,8 +94,16 @@ def rhs(u, v, elev):
     dvdt[:, 0] = - g * (elev[:, 1] - elev[:, -1])/dy
     dvdt[:, -1] = dvdt[:, 0]
 
-    # velocity divergence -h div(u)
-    delevdt[...] = -h * ((u[1:, :] - u[:-1, :])/dx + (v[:, 1:] - v[:, :-1])/dy)
+    # volume flux divergence -div(H u)
+    H = elev + h
+    # compute upwind Hu flux at U and V points
+    hu[1:-1, :] = numpy.where(u[1:-1, :] > 0, H[:-1, :], H[1:, :]) * u[1:-1, :]
+    hu[0, :] = numpy.where(u[0, :] > 0, H[-1, :], H[0, :]) * u[0, :]
+    hu[-1, :] = numpy.where(u[-1, :] > 0, H[-1, :], H[0, :]) * u[-1, :]
+    hv[:, 1:-1] = numpy.where(v[:, 1:-1] > 0, H[:, :-1], H[:, 1:]) * v[:, 1:-1]
+    hv[:, 0] = numpy.where(v[:, 0] > 0, H[:, -1], H[:, 0]) * v[:, 0]
+    hv[:, -1] = numpy.where(v[:, -1] > 0, H[:, -1], H[:, 0]) * v[:, -1]
+    delevdt[...] = -((hu[1:, :] - hu[:-1, :])/dx + (hv[:, 1:] - hv[:, :-1])/dy)
 
 
 plt.ion()
