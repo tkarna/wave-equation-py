@@ -4,7 +4,6 @@ import math
 
 # constants
 g = 9.81
-h = 1.0
 
 # run time
 t_end = 1.0
@@ -19,6 +18,11 @@ def initial_elev(x, y):
     y0 = 0.0
     dist2 = (x - x0)**2 + (y - y0)**2
     return amp * numpy.exp(-1.0 * dist2 / radius**2)
+
+
+def bathymetry(x, y):
+    """Expression for bathymetry"""
+    return 1.0 + numpy.exp(-(x**2/0.4))
 
 
 # grid
@@ -48,6 +52,9 @@ elev = numpy.zeros(T_shape, dtype=numpy.float64)
 u = numpy.zeros(U_shape, dtype=numpy.float64)
 v = numpy.zeros(V_shape, dtype=numpy.float64)
 
+# bathymetry
+h = numpy.zeros(T_shape, dtype=numpy.float64)
+
 # volume fluxes
 hu = numpy.zeros_like(u)
 hv = numpy.zeros_like(v)
@@ -73,9 +80,10 @@ delevdt = numpy.zeros_like(elev)
 
 # initial condition
 elev[...] = initial_elev(x_t_2d, y_t_2d)
+h[...] = bathymetry(x_t_2d, y_t_2d)
 
 # time step
-c = math.sqrt(g*h)
+c = float(numpy.max(numpy.sqrt(g*h)))
 alpha = 0.5
 dt = alpha * dx / c
 dt = t_export / int(math.ceil(t_export / dt))
