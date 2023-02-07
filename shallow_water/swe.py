@@ -4,6 +4,7 @@ import math
 
 # constants
 g = 9.81
+coriolis = 10.0
 
 # run time
 t_end = 1.0
@@ -150,6 +151,10 @@ def rhs(u, v, elev):
     uvx[-1, :] = numpy.where(u_at_v[-1, :] > 0, dvdx[-1, :], (v[0, :] - v[-1, :])/dx) * u_at_v[-1, :]
     dudt[:, :] += -uux - vuy
     dvdt[:, :] += -uvx - vvy
+
+    # Coriolis
+    dudt[:, :] += -coriolis*v_at_u
+    dvdt[:, :] += coriolis*u_at_v
 
 
 plt.ion()
