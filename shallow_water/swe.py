@@ -1,6 +1,10 @@
 import numpy.array_api as numpy
 import matplotlib.pyplot as plt
 import math
+import time as time_mod
+
+# options
+runtime_plot = False
 
 # constants
 g = 9.81
@@ -27,8 +31,8 @@ def bathymetry(x, y):
 
 
 # grid
-nx = 256
-ny = 256
+nx = 128
+ny = 128
 xlim = [-1, 1]
 ylim = [-1, 1]
 lx = xlim[1] - xlim[0]
@@ -48,13 +52,23 @@ T_shape = (nx, ny)
 U_shape = (nx + 1, ny)
 V_shape = (nx, ny+1)
 
+dofs_T = int(numpy.prod(numpy.asarray(T_shape)))
+dofs_U = int(numpy.prod(numpy.asarray(U_shape)))
+dofs_V = int(numpy.prod(numpy.asarray(V_shape)))
+
+print(f'Grid size: {nx} x {ny}')
+print(f'Elevation DOFs: {dofs_T}')
+print(f'Velocity  DOFs: {dofs_U + dofs_V}')
+print(f'Total     DOFs: {dofs_T + dofs_U + dofs_V}')
+
 # state variables
-elev = numpy.zeros(T_shape, dtype=numpy.float64)
-u = numpy.zeros(U_shape, dtype=numpy.float64)
-v = numpy.zeros(V_shape, dtype=numpy.float64)
+dtype = numpy.float64
+elev = numpy.zeros(T_shape, dtype=dtype)
+u = numpy.zeros(U_shape, dtype=dtype)
+v = numpy.zeros(V_shape, dtype=dtype)
 
 # bathymetry
-h = numpy.zeros(T_shape, dtype=numpy.float64)
+h = numpy.zeros(T_shape, dtype=dtype)
 
 # volume fluxes
 hu = numpy.zeros_like(u)
@@ -90,6 +104,7 @@ dt = alpha * dx / c
 dt = t_export / int(math.ceil(t_export / dt))
 nt = int(math.ceil(t_end / dt))
 print(f'Time step: {dt} s')
+print(f'Total run time: {t_end} s, {nt} time steps')
 
 
 def rhs(u, v, elev):
@@ -157,17 +172,19 @@ def rhs(u, v, elev):
     dvdt[:, :] += coriolis*u_at_v
 
 
-plt.ion()
-fig, ax = plt.subplots(nrows=1, ncols=1)
-vmax = 0.15
-img = ax.pcolormesh(x_u_1d, y_v_1d, elev, vmin=-vmax, vmax=vmax, cmap=plt.get_cmap('RdBu_r', 61))
-cb = plt.colorbar(img, label='Elevation')
-fig.canvas.draw()
-fig.canvas.flush_events()
+if runtime_plot:
+    plt.ion()
+    fig, ax = plt.subplots(nrows=1, ncols=1)
+    vmax = 0.15
+    img = ax.pcolormesh(x_u_1d, y_v_1d, elev, vmin=-vmax, vmax=vmax, cmap=plt.get_cmap('RdBu_r', 61))
+    cb = plt.colorbar(img, label='Elevation')
+    fig.canvas.draw()
+    fig.canvas.flush_events()
 
 t = 0
 i_export = 0
 next_t_export = 0
+tic = time_mod.perf_counter()
 for i in range(nt+1):
 
     t = i*dt
@@ -180,9 +197,10 @@ for i in range(nt+1):
             break
         i_export += 1
         next_t_export = i_export * t_export
-        img.update({'array': elev})
-        fig.canvas.draw()
-        fig.canvas.flush_events()
+        if runtime_plot:
+            img.update({'array': elev})
+            fig.canvas.draw()
+            fig.canvas.flush_events()
 
     # SSPRK33 time integrator
     rhs(u, v, elev)
@@ -198,6 +216,9 @@ for i in range(nt+1):
     v[...] = v/3 + 2/3*(v2 + dt*dvdt)
     elev[...] = elev/3 + 2/3*(elev2 + dt*delevdt)
 
+duration = time_mod.perf_counter() - tic
+print(f'Duration: {duration:.2f} s')
 
-plt.ioff()
-plt.show()
+if runtime_plot:
+    plt.ioff()
+    plt.show()
