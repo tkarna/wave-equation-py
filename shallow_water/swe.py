@@ -159,7 +159,7 @@ def rhs(u, v, elev):
 
 plt.ion()
 fig, ax = plt.subplots(nrows=1, ncols=1)
-vmax = 0.2
+vmax = 0.15
 img = ax.pcolormesh(x_u_1d, y_v_1d, elev, vmin=-vmax, vmax=vmax, cmap=plt.get_cmap('RdBu_r', 61))
 cb = plt.colorbar(img, label='Elevation')
 fig.canvas.draw()
