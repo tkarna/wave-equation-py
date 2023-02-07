@@ -68,6 +68,9 @@ elev = numpy.zeros(T_shape, dtype=dtype)
 u = numpy.zeros(U_shape, dtype=dtype)
 v = numpy.zeros(V_shape, dtype=dtype)
 
+# potential vorticity
+q = numpy.zeros(F_shape, dtype=dtype)
+
 # bathymetry
 h = numpy.zeros(T_shape, dtype=dtype)
 
@@ -176,6 +179,17 @@ def rhs(u, v, elev):
     dudt[:, :] += -coriolis*v_at_u
     dvdt[:, :] += coriolis*u_at_v
 
+    # PV
+    H_at_f = numpy.zeros(F_shape, dtype=dtype)
+    H_at_f[1:-1, 1:-1] = 0.25 * (H[1:, 1:] + H[:-1, 1:] + H[1:, :-1] + H[:-1, :-1])
+    H_at_f[0, 1:-1] = 0.25 * (H[0, 1:] + H[-1, 1:] + H[0, :-1] + H[-1, :-1])
+    H_at_f[-1, 1:-1] = H_at_f[0, 1:-1]
+    H_at_f[1:-1, 0] = 0.25 * (H[1:, 0] + H[:-1, 0] + H[1:, -1] + H[:-1, -1])
+    H_at_f[1:-1, -1] = H_at_f[1:-1, 0]
+    H_at_f[0, 0] = 0.25 * (H[0, 0] + H[-1, 0] + H[0, -1] + H[-1, 0])
+    H_at_f[0, -1] = H_at_f[-1, 0] = H_at_f[-1, -1] = H_at_f[0, 0]
+    q[:, :] = (coriolis - dudy + dvdx) / H_at_f
+
 
 if runtime_plot:
     plt.ion()
@@ -196,7 +210,9 @@ for i in range(nt+1):
 
     if t >= next_t_export:
         elev_max = float(numpy.max(elev))
-        print(f'{i:04d} {t:.3f} elev={elev_max:9.5f}')
+        u_max = float(numpy.max(u))
+        q_max = float(numpy.max(q))
+        print(f'{i:04d} {t:.3f} elev={elev_max:9.5f} u={u_max:9.5f} q={q_max:9.5f}')
         if elev_max > 1e3:
             print('Invalid elevation value')
             break
