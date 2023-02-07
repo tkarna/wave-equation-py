@@ -50,7 +50,8 @@ y_v_1d = numpy.linspace(ylim[0], ylim[1], ny + 1)
 
 T_shape = (nx, ny)
 U_shape = (nx + 1, ny)
-V_shape = (nx, ny+1)
+V_shape = (nx, ny + 1)
+F_shape = (nx + 1, ny + 1)
 
 dofs_T = int(numpy.prod(numpy.asarray(T_shape)))
 dofs_U = int(numpy.prod(numpy.asarray(U_shape)))
@@ -138,14 +139,16 @@ def rhs(u, v, elev):
     # advection of momentum
     # dudt += U . grad(u) = u dudx + v dudy = uux + vuy
     # dvdt += U . grad(v) = u dvdx + v dvdy = uvx + vvy
-    dudx = (u[1:, :] - u[:-1, :])/dx  # T point (nx, ny)
-    uux[1:-1, :] = numpy.where(u[1:-1, :] > 0, dudx[:-1, :], dudx[1:, :]) * u[1:-1, :]
-    uux[0, :] = numpy.where(u[0, :] > 0, dudx[-1, :], dudx[0, :]) * u[0, :]
-    uux[-1, :] = uux[0, :]  # periodic => u[0, :] == u[-1, :]
-    dvdy = (v[:, 1:] - v[:, :-1])/dy  # T point (nx, ny)
-    vvy[:, 1:-1] = numpy.where(v[:, 1:-1] > 0, dvdy[:, :-1], dvdy[:, 1:]) * v[:, 1:-1]
-    vvy[:, 0] = numpy.where(v[:, 0] > 0, dvdy[:, -1], dvdy[:, 0]) * v[:, 0]
-    vvy[:, -1] = vvy[:, 0]  # periodic
+    dudx = numpy.zeros((nx + 2, ny))  # T point extended for BC
+    dudx[1:-1, :] = (u[1:, :] - u[:-1, :])/dx
+    dudx[0, :] = (u[0, :] - u[-1, :])/dx
+    dudx[-1, :] = dudx[0, :]
+    uux[:, :] = numpy.where(u > 0, dudx[:-1, :], dudx[1:, :]) * u
+    dvdy = numpy.zeros((nx, ny + 2))  # T point extended for BC
+    dvdy[:, 1:-1] = (v[:, 1:] - v[:, :-1])/dy
+    dvdy[:, 0] = (v[:, 0] - v[:, -1])/dy
+    dvdy[:, -1] = dvdy[:, 0]
+    vvy[:, :] = numpy.where(v > 0, dvdy[:, :-1], dvdy[:, 1:]) * v
     v_at_u = numpy.zeros_like(u)  # U point (nx+1, ny)
     v_av_y = 0.5 * (v[:, 1:] + v[:, :-1])
     v_at_u[1:-1, :] = 0.5 * (v_av_y[1:, :] + v_av_y[:-1, :])
@@ -156,14 +159,16 @@ def rhs(u, v, elev):
     u_at_v[:, 1:-1] = 0.5 * (u_av_x[:, 1:] + u_av_x[:, :-1])
     u_at_v[:, 0] = 0.5 * (u_av_x[:, 0] + u_av_x[:, -1])
     u_at_v[:, -1] = u_at_v[:, 0]
-    dudy = (u[:, 1:] - u[:, :-1])/dy  # F point  (nx+1, ny-1)
-    vuy[:, 1:-1] = numpy.where(v_at_u[:, 1:-1] > 0, dudy[:, :-1], dudy[:, 1:]) * v_at_u[:, 1:-1]
-    vuy[:, 0] = numpy.where(v_at_u[:, 0] > 0, (u[:, 0] - u[:, -1])/dy, dudy[:, 0]) * v_at_u[:, 0]
-    vuy[:, -1] = numpy.where(v_at_u[:, -1] > 0, dudy[:, -1], (u[:, 0] - u[:, -1])/dy) * v_at_u[:, -1]
-    dvdx = (v[1:, :] - v[:-1, :])/dx  # F point  (nx-1, ny+1)
-    uvx[1:-1, :] = numpy.where(u_at_v[1:-1, :] > 0, dvdx[:-1, :], dvdx[1:, :]) * u_at_v[1:-1, :]
-    uvx[0, :] = numpy.where(u_at_v[0, :] > 0, (v[0, :] - v[-1, :])/dx, dvdx[0, :]) * u_at_v[0, :]
-    uvx[-1, :] = numpy.where(u_at_v[-1, :] > 0, dvdx[-1, :], (v[0, :] - v[-1, :])/dx) * u_at_v[-1, :]
+    dudy = numpy.zeros(F_shape, dtype=dtype)  # F point (nx+1, nx+1)
+    dudy[:, 1:-1] = (u[:, 1:] - u[:, :-1])/dy
+    dudy[:, 0] = (u[:, 0] - u[:, -1])/dy
+    dudy[:, -1] = dudy[:, 0]
+    vuy[:, :] = numpy.where(v_at_u > 0, dudy[:, :-1], dudy[:, 1:]) * v_at_u
+    dvdx = numpy.zeros(F_shape, dtype=dtype)  # F point (nx+1, nx+1)
+    dvdx[1:-1, :] = (v[1:, :] - v[:-1, :])/dx
+    dvdx[0, :] = (v[0, :] - v[-1, :])/dx
+    dvdx[-1, :] = dvdx[0, :]
+    uvx[:, :] = numpy.where(u_at_v > 0, dvdx[:-1, :], dvdx[1:, :]) * u_at_v
     dudt[:, :] += -uux - vuy
     dvdt[:, :] += -uvx - vvy
 
