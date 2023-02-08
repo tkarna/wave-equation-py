@@ -45,7 +45,7 @@ dy = ly/ny
 # coordinates of T points (cell center)
 x_t_1d = numpy.linspace(xlim[0] + dx/2, xlim[1] - dx/2, nx)
 y_t_1d = numpy.linspace(ylim[0] + dy/2, ylim[1] - dy/2, ny)
-x_t_2d, y_t_2d = numpy.meshgrid(x_t_1d, y_t_1d, indexing='xy')
+x_t_2d, y_t_2d = numpy.meshgrid(x_t_1d, y_t_1d, indexing='ij')
 # coordinates of U and V points (edge centers)
 x_u_1d = numpy.linspace(xlim[0], xlim[1], nx + 1)
 y_v_1d = numpy.linspace(ylim[0], ylim[1], ny + 1)
@@ -212,8 +212,8 @@ def rhs(u, v, elev):
         dvdt[:, :] += -uvx - vvy
 
         # Coriolis
-        dudt[:, :] += -coriolis*v_at_u
-        dvdt[:, :] += coriolis*u_at_v
+        dudt[:, :] += +coriolis*v_at_u
+        dvdt[:, :] += -coriolis*u_at_v
 
     else:
         # total depth at F points
@@ -282,7 +282,7 @@ if runtime_plot:
     plt.ion()
     fig, ax = plt.subplots(nrows=1, ncols=1)
     vmax = 0.15
-    img = ax.pcolormesh(x_u_1d, y_v_1d, elev, vmin=-vmax, vmax=vmax, cmap=plt.get_cmap('RdBu_r', 61))
+    img = ax.pcolormesh(x_u_1d, y_v_1d, elev.T, vmin=-vmax, vmax=vmax, cmap=plt.get_cmap('RdBu_r', 61))
     cb = plt.colorbar(img, label='Elevation')
     fig.canvas.draw()
     fig.canvas.flush_events()
@@ -323,7 +323,7 @@ for i in range(nt+1):
         i_export += 1
         next_t_export = i_export * t_export
         if runtime_plot:
-            img.update({'array': elev})
+            img.update({'array': elev.T})
             fig.canvas.draw()
             fig.canvas.flush_events()
 
