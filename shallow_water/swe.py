@@ -29,7 +29,7 @@ def initial_elev(x, y):
 
 def bathymetry(x, y):
     """Expression for bathymetry"""
-    return 1.0 #+ numpy.exp(-(x**2/0.4))
+    return 1.0 + numpy.exp(-(x**2/0.4))
 
 
 # grid
@@ -106,6 +106,7 @@ delevdt = numpy.zeros_like(elev)
 # initial condition
 elev[...] = initial_elev(x_t_2d, y_t_2d)
 h[...] = bathymetry(x_t_2d, y_t_2d)
+pe_offset = 0.5 * g * numpy.mean(h**2)  # pe for elev=0
 
 # time step
 c = float(numpy.max(numpy.sqrt(g*h)))
@@ -127,8 +128,8 @@ def compute_energy(u, v, elev):
     u2_at_t = 0.5 * (u2[1:, :] + u2[:-1, :])
     v2_at_t = 0.5 * (v2[:, 1:] + v2[:, :-1])
     ke[:, :] = 0.5 * (u2_at_t + v2_at_t)
-    # potential energy, pe = 1/2 g elev
-    pe[:, :] = 0.5 * g * elev
+    # potential energy, pe = 1/2 g (elev^2 - h^2) + offset
+    pe[:, :] = 0.5 * g * (elev + h) * (elev - h) + pe_offset
 
 
 def rhs(u, v, elev):
@@ -304,7 +305,7 @@ for i in range(nt+1):
 
         H = elev + h
         total_ke = float(numpy.sum(H * ke)) * dx * dy
-        total_pe = float(numpy.sum(H * pe)) * dx * dy
+        total_pe = float(numpy.sum(pe)) * dx * dy
         total_e = total_ke + total_pe
         total_v = float(numpy.sum(H)) * dx * dy
         if initial_e is None:
