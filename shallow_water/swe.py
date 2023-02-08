@@ -290,6 +290,7 @@ i_export = 0
 next_t_export = 0
 compute_energy(u, v, elev)
 initial_e = None
+initial_v = None
 tic = time_mod.perf_counter()
 for i in range(nt+1):
 
@@ -304,11 +305,14 @@ for i in range(nt+1):
         total_ke = float(numpy.sum(H * ke)) * dx * dy
         total_pe = float(numpy.sum(H * pe)) * dx * dy
         total_e = total_ke + total_pe
+        total_v = float(numpy.sum(H)) * dx * dy
         if initial_e is None:
             initial_e = total_e
-        total_e -= initial_e
+            initial_v = total_v
+        diff_e = total_e - initial_e
+        diff_v = total_v - initial_v
 
-        print(f'{i_export:2d} {i:4d} {t:.3f} elev={elev_max:7.5f} u={u_max:7.5f} q={q_max:8.5f} PE={total_pe:5.3f} KE={total_ke:5.3f} E={total_e:6.3e}')
+        print(f'{i_export:2d} {i:4d} {t:.3f} elev={elev_max:7.5f} u={u_max:7.5f} q={q_max:8.5f} dV={diff_v: 6.3e} PE={total_pe:5.3f} KE={total_ke:5.3f} dE={diff_e: 6.3e}')
 
         if elev_max > 1e3:
             print('Invalid elevation value')
