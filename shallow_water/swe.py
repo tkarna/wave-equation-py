@@ -144,9 +144,9 @@ def rhs(u, v, elev):
     dvdt[:, 1:-1] = -g * (elev[:, 1:] - elev[:, :-1])/dy
 
     # periodic boundary
-    dudt[0, :] = - g * (elev[1, :] - elev[-1, :])/dx
+    dudt[0, :] = - g * (elev[0, :] - elev[-1, :])/dx
     dudt[-1, :] = dudt[0, :]
-    dvdt[:, 0] = - g * (elev[:, 1] - elev[:, -1])/dy
+    dvdt[:, 0] = - g * (elev[:, 0] - elev[:, -1])/dy
     dvdt[:, -1] = dvdt[:, 0]
 
     # volume flux divergence -div(H u)
