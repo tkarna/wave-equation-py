@@ -4,7 +4,7 @@ import math
 import time as time_mod
 
 # options
-runtime_plot = False
+runtime_plot = True
 plot_energy = True
 use_vector_invariant_form = True
 
@@ -280,10 +280,19 @@ def rhs(u, v, elev):
 
 if runtime_plot:
     plt.ion()
-    fig, ax = plt.subplots(nrows=1, ncols=1)
+    fig, ax_list = plt.subplots(nrows=1, ncols=2, sharey=True, figsize=(13, 5))
+    ax = ax_list[0]
     vmax = 0.15
-    img = ax.pcolormesh(x_u_1d, y_v_1d, elev.T, vmin=-vmax, vmax=vmax, cmap=plt.get_cmap('RdBu_r', 61))
-    cb = plt.colorbar(img, label='Elevation')
+    img1 = ax.pcolormesh(x_u_1d, y_v_1d, elev.T, vmin=-vmax, vmax=vmax, cmap=plt.get_cmap('RdBu_r', 61))
+    cb = plt.colorbar(img1, label='Elevation')
+    ax.set_aspect('equal')
+    ax = ax_list[1]
+    vmax = 0.7
+    u_at_t = 0.5 * (u[1:, :] + u[:-1, :])
+    img2 = ax.pcolormesh(x_u_1d, y_v_1d, u_at_t.T, vmin=-vmax, vmax=vmax, cmap=plt.get_cmap('RdBu_r', 61))
+    cb = plt.colorbar(img2, label='X Velocity')
+    ax.set_aspect('equal')
+    fig.tight_layout()
     fig.canvas.draw()
     fig.canvas.flush_events()
 
@@ -323,7 +332,8 @@ for i in range(nt+1):
         i_export += 1
         next_t_export = i_export * t_export
         if runtime_plot:
-            img.update({'array': elev.T})
+            img1.update({'array': elev.T})
+            img2.update({'array': 0.5*(u[1:, :] + u[:-1, :]).T})
             fig.canvas.draw()
             fig.canvas.flush_events()
 
