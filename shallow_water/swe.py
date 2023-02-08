@@ -5,6 +5,7 @@ import time as time_mod
 
 # options
 runtime_plot = False
+use_vector_invariant_form = True
 
 # constants
 g = 9.81
@@ -27,7 +28,7 @@ def initial_elev(x, y):
 
 def bathymetry(x, y):
     """Expression for bathymetry"""
-    return 1.0 + numpy.exp(-(x**2/0.4))
+    return 1.0 #+ numpy.exp(-(x**2/0.4))
 
 
 # grid
@@ -71,6 +72,10 @@ v = numpy.zeros(V_shape, dtype=dtype)
 # potential vorticity
 q = numpy.zeros(F_shape, dtype=dtype)
 
+# energy
+ke = numpy.zeros(T_shape, dtype=dtype)
+pe = numpy.zeros(T_shape, dtype=dtype)
+
 # bathymetry
 h = numpy.zeros(T_shape, dtype=dtype)
 
@@ -111,6 +116,20 @@ print(f'Time step: {dt} s')
 print(f'Total run time: {t_end} s, {nt} time steps')
 
 
+def compute_energy(u, v, elev):
+    """
+    Compute kinetic and potential energy from model state.
+    """
+    # kinetic energy, ke = 1/2 |u|^2
+    u2 = u**2
+    v2 = v**2
+    u2_at_t = 0.5 * (u2[1:, :] + u2[:-1, :])
+    v2_at_t = 0.5 * (v2[:, 1:] + v2[:, :-1])
+    ke[:, :] = 0.5 * (u2_at_t + v2_at_t)
+    # potential energy, pe = 1/2 g elev
+    pe[:, :] = 0.5 * g * elev
+
+
 def rhs(u, v, elev):
     """
     Evaluate right hand side of the equations
@@ -130,65 +149,131 @@ def rhs(u, v, elev):
 
     # volume flux divergence -div(H u)
     H = elev + h
+
     # compute upwind Hu flux at U and V points
-    hu[1:-1, :] = numpy.where(u[1:-1, :] > 0, H[:-1, :], H[1:, :]) * u[1:-1, :]
-    hu[0, :] = numpy.where(u[0, :] > 0, H[-1, :], H[0, :]) * u[0, :]
-    hu[-1, :] = numpy.where(u[-1, :] > 0, H[-1, :], H[0, :]) * u[-1, :]
-    hv[:, 1:-1] = numpy.where(v[:, 1:-1] > 0, H[:, :-1], H[:, 1:]) * v[:, 1:-1]
-    hv[:, 0] = numpy.where(v[:, 0] > 0, H[:, -1], H[:, 0]) * v[:, 0]
-    hv[:, -1] = numpy.where(v[:, -1] > 0, H[:, -1], H[:, 0]) * v[:, -1]
+    # hu[1:-1, :] = numpy.where(u[1:-1, :] > 0, H[:-1, :], H[1:, :]) * u[1:-1, :]
+    # hu[0, :] = numpy.where(u[0, :] > 0, H[-1, :], H[0, :]) * u[0, :]
+    # hu[-1, :] = numpy.where(u[-1, :] > 0, H[-1, :], H[0, :]) * u[-1, :]
+    # hv[:, 1:-1] = numpy.where(v[:, 1:-1] > 0, H[:, :-1], H[:, 1:]) * v[:, 1:-1]
+    # hv[:, 0] = numpy.where(v[:, 0] > 0, H[:, -1], H[:, 0]) * v[:, 0]
+    # hv[:, -1] = numpy.where(v[:, -1] > 0, H[:, -1], H[:, 0]) * v[:, -1]
+
+    # Hu flux using mean H
+    hu[1:-1, :] = 0.5 * (H[:-1, :] + H[1:, :]) * u[1:-1, :]
+    hu[0, :] = 0.5 * (H[-1, :] + H[0, :]) * u[0, :]
+    hu[-1, :] = hu[0, :]
+    hv[:, 1:-1] = 0.5 * (H[:, :-1] + H[:, 1:]) * v[:, 1:-1]
+    hv[:, 0] = 0.5 * (H[:, -1] + H[:, 0]) * v[:, 0]
+    hv[:, -1] = hv[:, 0]
+
     delevdt[...] = -((hu[1:, :] - hu[:-1, :])/dx + (hv[:, 1:] - hv[:, :-1])/dy)
 
-    # advection of momentum
-    # dudt += U . grad(u) = u dudx + v dudy = uux + vuy
-    # dvdt += U . grad(v) = u dvdx + v dvdy = uvx + vvy
-    dudx = numpy.zeros((nx + 2, ny))  # T point extended for BC
-    dudx[1:-1, :] = (u[1:, :] - u[:-1, :])/dx
-    dudx[0, :] = (u[0, :] - u[-1, :])/dx
-    dudx[-1, :] = dudx[0, :]
-    uux[:, :] = numpy.where(u > 0, dudx[:-1, :], dudx[1:, :]) * u
-    dvdy = numpy.zeros((nx, ny + 2))  # T point extended for BC
-    dvdy[:, 1:-1] = (v[:, 1:] - v[:, :-1])/dy
-    dvdy[:, 0] = (v[:, 0] - v[:, -1])/dy
-    dvdy[:, -1] = dvdy[:, 0]
-    vvy[:, :] = numpy.where(v > 0, dvdy[:, :-1], dvdy[:, 1:]) * v
-    v_at_u = numpy.zeros_like(u)  # U point (nx+1, ny)
-    v_av_y = 0.5 * (v[:, 1:] + v[:, :-1])
-    v_at_u[1:-1, :] = 0.5 * (v_av_y[1:, :] + v_av_y[:-1, :])
-    v_at_u[0, :] = 0.5 * (v_av_y[0, :] + v_av_y[-1, :])
-    v_at_u[-1, :] = v_at_u[0, :]
-    u_at_v = numpy.zeros_like(v)  # V point (nx, ny+1)
-    u_av_x = 0.5 * (u[1:, :] + u[:-1, :])
-    u_at_v[:, 1:-1] = 0.5 * (u_av_x[:, 1:] + u_av_x[:, :-1])
-    u_at_v[:, 0] = 0.5 * (u_av_x[:, 0] + u_av_x[:, -1])
-    u_at_v[:, -1] = u_at_v[:, 0]
     dudy = numpy.zeros(F_shape, dtype=dtype)  # F point (nx+1, nx+1)
     dudy[:, 1:-1] = (u[:, 1:] - u[:, :-1])/dy
     dudy[:, 0] = (u[:, 0] - u[:, -1])/dy
     dudy[:, -1] = dudy[:, 0]
-    vuy[:, :] = numpy.where(v_at_u > 0, dudy[:, :-1], dudy[:, 1:]) * v_at_u
+
     dvdx = numpy.zeros(F_shape, dtype=dtype)  # F point (nx+1, nx+1)
     dvdx[1:-1, :] = (v[1:, :] - v[:-1, :])/dx
     dvdx[0, :] = (v[0, :] - v[-1, :])/dx
     dvdx[-1, :] = dvdx[0, :]
-    uvx[:, :] = numpy.where(u_at_v > 0, dvdx[:-1, :], dvdx[1:, :]) * u_at_v
-    dudt[:, :] += -uux - vuy
-    dvdt[:, :] += -uvx - vvy
 
-    # Coriolis
-    dudt[:, :] += -coriolis*v_at_u
-    dvdt[:, :] += coriolis*u_at_v
+    compute_energy(u, v, elev)
 
-    # PV
-    H_at_f = numpy.zeros(F_shape, dtype=dtype)
-    H_at_f[1:-1, 1:-1] = 0.25 * (H[1:, 1:] + H[:-1, 1:] + H[1:, :-1] + H[:-1, :-1])
-    H_at_f[0, 1:-1] = 0.25 * (H[0, 1:] + H[-1, 1:] + H[0, :-1] + H[-1, :-1])
-    H_at_f[-1, 1:-1] = H_at_f[0, 1:-1]
-    H_at_f[1:-1, 0] = 0.25 * (H[1:, 0] + H[:-1, 0] + H[1:, -1] + H[:-1, -1])
-    H_at_f[1:-1, -1] = H_at_f[1:-1, 0]
-    H_at_f[0, 0] = 0.25 * (H[0, 0] + H[-1, 0] + H[0, -1] + H[-1, 0])
-    H_at_f[0, -1] = H_at_f[-1, 0] = H_at_f[-1, -1] = H_at_f[0, 0]
-    q[:, :] = (coriolis - dudy + dvdx) / H_at_f
+    if not use_vector_invariant_form:
+        # advection of momentum
+        # dudt += U . grad(u) = u dudx + v dudy = uux + vuy
+        # dvdt += U . grad(v) = u dvdx + v dvdy = uvx + vvy
+        dudx = numpy.zeros((nx + 2, ny))  # T point extended for BC
+        dudx[1:-1, :] = (u[1:, :] - u[:-1, :])/dx
+        dudx[0, :] = (u[0, :] - u[-1, :])/dx
+        dudx[-1, :] = dudx[0, :]
+        uux[:, :] = numpy.where(u > 0, dudx[:-1, :], dudx[1:, :]) * u
+        dvdy = numpy.zeros((nx, ny + 2))  # T point extended for BC
+        dvdy[:, 1:-1] = (v[:, 1:] - v[:, :-1])/dy
+        dvdy[:, 0] = (v[:, 0] - v[:, -1])/dy
+        dvdy[:, -1] = dvdy[:, 0]
+        vvy[:, :] = numpy.where(v > 0, dvdy[:, :-1], dvdy[:, 1:]) * v
+        v_at_u = numpy.zeros_like(u)  # U point (nx+1, ny)
+        v_av_y = 0.5 * (v[:, 1:] + v[:, :-1])
+        v_at_u[1:-1, :] = 0.5 * (v_av_y[1:, :] + v_av_y[:-1, :])
+        v_at_u[0, :] = 0.5 * (v_av_y[0, :] + v_av_y[-1, :])
+        v_at_u[-1, :] = v_at_u[0, :]
+        u_at_v = numpy.zeros_like(v)  # V point (nx, ny+1)
+        u_av_x = 0.5 * (u[1:, :] + u[:-1, :])
+        u_at_v[:, 1:-1] = 0.5 * (u_av_x[:, 1:] + u_av_x[:, :-1])
+        u_at_v[:, 0] = 0.5 * (u_av_x[:, 0] + u_av_x[:, -1])
+        u_at_v[:, -1] = u_at_v[:, 0]
+        vuy[:, :] = numpy.where(v_at_u > 0, dudy[:, :-1], dudy[:, 1:]) * v_at_u
+        uvx[:, :] = numpy.where(u_at_v > 0, dvdx[:-1, :], dvdx[1:, :]) * u_at_v
+        dudt[:, :] += -uux - vuy
+        dvdt[:, :] += -uvx - vvy
+
+        # Coriolis
+        dudt[:, :] += -coriolis*v_at_u
+        dvdt[:, :] += coriolis*u_at_v
+
+    else:
+        # total depth at F points
+        H_at_f = numpy.zeros(F_shape, dtype=dtype)
+        H_at_f[1:-1, 1:-1] = 0.25 * (H[1:, 1:] + H[:-1, 1:] + H[1:, :-1] + H[:-1, :-1])
+        H_at_f[0, 1:-1] = 0.25 * (H[0, 1:] + H[-1, 1:] + H[0, :-1] + H[-1, :-1])
+        H_at_f[-1, 1:-1] = H_at_f[0, 1:-1]
+        H_at_f[1:-1, 0] = 0.25 * (H[1:, 0] + H[:-1, 0] + H[1:, -1] + H[:-1, -1])
+        H_at_f[1:-1, -1] = H_at_f[1:-1, 0]
+        H_at_f[0, 0] = 0.25 * (H[0, 0] + H[-1, 0] + H[0, -1] + H[-1, -1])
+        H_at_f[0, -1] = H_at_f[-1, 0] = H_at_f[-1, -1] = H_at_f[0, 0]
+
+        # potential vorticity
+        q[:, :] = (coriolis - dudy + dvdx) / H_at_f
+
+        # Advection of potential vorticity, Arakawa and Hsu (1990)
+        # Define alpha, beta, gamma, delta for each cell in T points
+        w = 1./12
+        # alpha[i,j+0.5] = 1/12 (q[i,j+1] + q[i,j] + q[i+1,j+1]) ▛
+        q_a = w * (q[:-1, 1:] + q[:-1, :-1] + q[1:, 1:])
+        # beta[i,j+0.5] = 1/12 (q[i,j+1] + q[i,j] + q[i-1,j+1]) ▜
+        q_b = w * (q[1:, 1:] + q[1:, :-1] + q[:-1, 1:])
+        # gamma[i,j+0.5] = 1/12 (q[i,j] + q[i,j+1] + q[i-1,j]) ▟
+        q_g = w * (q[1:, :-1] + q[1:, 1:] + q[:-1, :-1])
+        # delta[i,j+0.5] = 1/12 (q[i,j] + q[i,j+1] + q[i+1,j]) ▙
+        q_d = w * (q[:-1, :-1] + q[:-1, 1:] + q[1:, :-1])
+
+        # potential vorticity advection terms
+        qhv = numpy.zeros(U_shape, dtype=dtype)
+        qhv[:-1, :] += q_a[:, :] * hv[:, 1:]
+        qhv[-1, :] += q_a[0, :] * hv[0, 1:]
+        qhv[1:, :] += q_b[:, :] * hv[:, 1:]
+        qhv[0, :] += q_b[-1, :] * hv[-1, 1:]
+        qhv[1:, :] += q_g[:, :] * hv[:, :-1]
+        qhv[0, :] += q_g[-1, :] * hv[-1, :-1]
+        qhv[:-1, :] += q_d[:, :] * hv[:, :-1]
+        qhv[-1, :] += q_d[0, :] * hv[0, :-1]
+        qhu = numpy.zeros(V_shape, dtype=dtype)
+        qhu[:, :-1] += q_g[:, :] * hu[1:, :]
+        qhu[:, -1] += q_g[:, 0] * hu[1:, 0]
+        qhu[:, :-1] += q_d[:, :] * hu[:-1, :]
+        qhu[:, -1] += q_d[:, 0] * hu[:-1, 0]
+        qhu[:, 1:] += q_a[:, :] * hu[:-1, :]
+        qhu[:, 0] += q_a[:, -1] * hu[:-1, -1]
+        qhu[:, 1:] += q_b[:, :] * hu[1:, :]
+        qhu[:, 0] += q_a[:, -1] * hu[1:, -1]
+
+        dudt[:, :] += +qhv
+        dvdt[:, :] += -qhu
+
+        # gradient of ke
+        dkedx = numpy.zeros(U_shape, dtype=dtype)
+        dkedx[1:-1, :] = (ke[1:, :] - ke[:-1, :])/dx
+        dkedx[0, :] = (ke[0, :] - ke[-1, :])/dx
+        dkedx[-1, :] = dkedx[0, :]
+        dkedy = numpy.zeros(V_shape, dtype=dtype)
+        dkedy[:, 1:-1] = (ke[:, 1:] - ke[:, :-1])/dy
+        dkedy[:, 0] = (ke[:, 0] - ke[:, -1])/dy
+        dkedy[:, -1] = dkedy[:, 0]
+
+        dudt[:, :] += -dkedx
+        dvdt[:, :] += -dkedy
 
 
 if runtime_plot:
@@ -203,6 +288,8 @@ if runtime_plot:
 t = 0
 i_export = 0
 next_t_export = 0
+compute_energy(u, v, elev)
+initial_e = None
 tic = time_mod.perf_counter()
 for i in range(nt+1):
 
@@ -212,7 +299,17 @@ for i in range(nt+1):
         elev_max = float(numpy.max(elev))
         u_max = float(numpy.max(u))
         q_max = float(numpy.max(q))
-        print(f'{i:04d} {t:.3f} elev={elev_max:9.5f} u={u_max:9.5f} q={q_max:9.5f}')
+
+        H = elev + h
+        total_ke = float(numpy.sum(H * ke)) * dx * dy
+        total_pe = float(numpy.sum(H * pe)) * dx * dy
+        total_e = total_ke + total_pe
+        if initial_e is None:
+            initial_e = total_e
+        total_e -= initial_e
+
+        print(f'{i_export:2d} {i:4d} {t:.3f} elev={elev_max:7.5f} u={u_max:7.5f} q={q_max:8.5f} PE={total_pe:5.3f} KE={total_ke:5.3f} E={total_e:6.3e}')
+
         if elev_max > 1e3:
             print('Invalid elevation value')
             break
