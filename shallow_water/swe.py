@@ -314,8 +314,8 @@ for i in range(nt+1):
 
         print(f'{i_export:2d} {i:4d} {t:.3f} elev={elev_max:7.5f} u={u_max:7.5f} q={q_max:8.5f} dV={diff_v: 6.3e} PE={total_pe:5.3f} KE={total_ke:5.3f} dE={diff_e: 6.3e}')
 
-        if elev_max > 1e3:
-            print('Invalid elevation value')
+        if elev_max > 1e3 or not math.isfinite(elev_max):
+            print(f'Invalid elevation value: {elev_max}')
             break
         i_export += 1
         next_t_export = i_export * t_export
