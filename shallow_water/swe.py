@@ -5,6 +5,7 @@ import time as time_mod
 
 # options
 runtime_plot = False
+plot_energy = True
 use_vector_invariant_form = True
 
 # constants
@@ -290,7 +291,7 @@ i_export = 0
 next_t_export = 0
 compute_energy(u, v, elev)
 initial_e = None
-initial_v = None
+ene_series = []
 tic = time_mod.perf_counter()
 for i in range(nt+1):
 
@@ -311,6 +312,7 @@ for i in range(nt+1):
             initial_v = total_v
         diff_e = total_e - initial_e
         diff_v = total_v - initial_v
+        ene_series.append([total_pe, total_ke, total_e])
 
         print(f'{i_export:2d} {i:4d} {t:.3f} elev={elev_max:7.5f} u={u_max:7.5f} q={q_max:8.5f} dV={diff_v: 6.3e} PE={total_pe:5.3f} KE={total_ke:5.3f} dE={diff_e: 6.3e}')
 
@@ -343,4 +345,21 @@ print(f'Duration: {duration:.2f} s')
 
 if runtime_plot:
     plt.ioff()
+    plt.show()
+
+if plot_energy:
+    import numpy as np
+    ene_series = np.asarray(ene_series)
+    pe = ene_series[:, 0]
+    ke = ene_series[:, 1]
+    te = ene_series[:, 2]
+    time = np.arange(pe.shape[0], dtype=dtype) * t_export
+    plt.plot(time, te, 'SpringGreen', label='total E')
+    plt.plot(time, pe, 'Crimson', label='potential E')
+    plt.plot(time, ke, 'RoyalBlue', label='kinetic E')
+    plt.axhline(te[0], color='k', zorder=0)
+    plt.xlabel('Time')
+    plt.ylabel('Energy')
+    plt.legend()
+    plt.grid(True)
     plt.show()
