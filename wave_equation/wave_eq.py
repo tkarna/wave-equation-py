@@ -15,14 +15,27 @@ t_end = 1.0
 t_export = 0.02
 
 
+def exact_elevation(x, y, t):
+    """
+    Exact solution for elevation field.
+
+    Returns time-dependent elevation of a 2D standing wave in a rectangular
+    domain.
+    """
+    amp = 0.5
+    c = math.sqrt(g * h)
+    n = 1
+    sol_x = numpy.sin(2 * n * numpy.pi * x / lx)
+    m = 1
+    sol_y = numpy.sin(2 * m * numpy.pi * y / ly)
+    omega = c * numpy.pi * math.sqrt((n/lx)**2 + (m/ly)**2)
+    sol_t = numpy.cos(2 * omega * t)
+    return amp * sol_x * sol_y * sol_t
+
+
 def initial_elev(x, y):
     """Set initial condition for water elevation"""
-    amp = 0.5
-    radius = 0.1
-    x0 = -0.3
-    y0 = -0.2
-    dist2 = (x - x0)**2 + (y - y0)**2
-    return amp * numpy.exp(-1.0 * dist2 / radius**2)
+    return exact_elevation(x, y, 0)
 
 
 # grid
@@ -99,9 +112,9 @@ def rhs(u, v, elev):
     dvdt[:, 1:-1] = -g * (elev[:, 1:] - elev[:, :-1])/dy
 
     # periodic boundary
-    dudt[0, :] = - g * (elev[1, :] - elev[-1, :])/dx
+    dudt[0, :] = - g * (elev[0, :] - elev[-1, :])/dx
     dudt[-1, :] = dudt[0, :]
-    dvdt[:, 0] = - g * (elev[:, 1] - elev[:, -1])/dy
+    dvdt[:, 0] = - g * (elev[:, 0] - elev[:, -1])/dy
     dvdt[:, -1] = dvdt[:, 0]
 
     # velocity divergence -h div(u)
@@ -111,7 +124,7 @@ def rhs(u, v, elev):
 if runtime_plot:
     plt.ion()
     fig, ax = plt.subplots(nrows=1, ncols=1)
-    vmax = 0.2
+    vmax = 0.5
     img = ax.pcolormesh(x_u_1d, y_v_1d, elev.T, vmin=-vmax, vmax=vmax, cmap='RdBu_r')
     cb = plt.colorbar(img, label='Elevation')
     fig.canvas.draw()
@@ -163,6 +176,17 @@ for i in range(nt+1):
 duration = time_mod.perf_counter() - tic
 print(f'Duration: {duration:.2f} s')
 
+elev_exact = exact_elevation(x_t_2d, y_t_2d, t)
+err_L2 = numpy.sum((elev_exact - elev)**2) * dx * dy / lx / ly
+print(f'L2 error: {err_L2:5.3e}')
+
 if runtime_plot:
     plt.ioff()
+
+    fig2, ax2 = plt.subplots(nrows=1, ncols=1)
+    vmax = 0.5
+    img2 = ax2.pcolormesh(x_u_1d, y_v_1d, elev_exact.T, vmin=-vmax, vmax=vmax, cmap='RdBu_r')
+    cb = plt.colorbar(img2, label='Elevation')
+    ax2.set_title('Exact')
+
     plt.show()
