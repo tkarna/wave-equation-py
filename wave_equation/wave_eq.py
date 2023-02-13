@@ -1,14 +1,18 @@
-import numpy.array_api as numpy
+import numpy
 import matplotlib.pyplot as plt
 import math
+import time as time_mod
+
+# options
+runtime_plot = True
 
 # constants
 g = 9.81
 h = 1.0
 
 # run time
-t_end = 2.0
-t_export = 0.05
+t_end = 1.0
+t_export = 0.02
 
 
 def initial_elev(x, y):
@@ -22,8 +26,8 @@ def initial_elev(x, y):
 
 
 # grid
-nx = 256
-ny = 256
+nx = 128
+ny = 128
 xlim = [-1, 1]
 ylim = [-1, 1]
 lx = xlim[1] - xlim[0]
@@ -34,7 +38,7 @@ dy = ly/ny
 # coordinates of T points (cell center)
 x_t_1d = numpy.linspace(xlim[0] + dx/2, xlim[1] - dx/2, nx)
 y_t_1d = numpy.linspace(ylim[0] + dy/2, ylim[1] - dy/2, ny)
-x_t_2d, y_t_2d = numpy.meshgrid(x_t_1d, y_t_1d, indexing='xy')
+x_t_2d, y_t_2d = numpy.meshgrid(x_t_1d, y_t_1d, indexing='ij')
 # coordinates of U and V points (edge centers)
 x_u_1d = numpy.linspace(xlim[0], xlim[1], nx + 1)
 y_v_1d = numpy.linspace(ylim[0], ylim[1], ny + 1)
@@ -42,6 +46,15 @@ y_v_1d = numpy.linspace(ylim[0], ylim[1], ny + 1)
 T_shape = (nx, ny)
 U_shape = (nx + 1, ny)
 V_shape = (nx, ny+1)
+
+dofs_T = int(numpy.prod(numpy.asarray(T_shape)))
+dofs_U = int(numpy.prod(numpy.asarray(U_shape)))
+dofs_V = int(numpy.prod(numpy.asarray(V_shape)))
+
+print(f'Grid size: {nx} x {ny}')
+print(f'Elevation DOFs: {dofs_T}')
+print(f'Velocity  DOFs: {dofs_U + dofs_V}')
+print(f'Total     DOFs: {dofs_T + dofs_U + dofs_V}')
 
 # state variables
 elev = numpy.zeros(T_shape, dtype=numpy.float64)
@@ -71,6 +84,7 @@ dt = alpha * dx / c
 dt = t_export / int(math.ceil(t_export / dt))
 nt = int(math.ceil(t_end / dt))
 print(f'Time step: {dt} s')
+print(f'Total run time: {t_end} s, {nt} time steps')
 
 
 def rhs(u, v, elev):
@@ -94,32 +108,43 @@ def rhs(u, v, elev):
     delevdt[...] = -h * ((u[1:, :] - u[:-1, :])/dx + (v[:, 1:] - v[:, :-1])/dy)
 
 
-plt.ion()
-fig, ax = plt.subplots(nrows=1, ncols=1)
-vmax = 0.2
-img = ax.pcolormesh(x_u_1d, y_v_1d, elev, vmin=-vmax, vmax=vmax, cmap='RdBu_r')
-cb = plt.colorbar(img, label='Elevation')
-fig.canvas.draw()
-fig.canvas.flush_events()
+if runtime_plot:
+    plt.ion()
+    fig, ax = plt.subplots(nrows=1, ncols=1)
+    vmax = 0.2
+    img = ax.pcolormesh(x_u_1d, y_v_1d, elev.T, vmin=-vmax, vmax=vmax, cmap='RdBu_r')
+    cb = plt.colorbar(img, label='Elevation')
+    fig.canvas.draw()
+    fig.canvas.flush_events()
 
 t = 0
 i_export = 0
 next_t_export = 0
+initial_v = None
+tic = time_mod.perf_counter()
 for i in range(nt+1):
 
     t = i*dt
 
     if t >= next_t_export:
         elev_max = float(numpy.max(elev))
-        print(f'{i:04d} {t:.3f} elev={elev_max:9.5f}')
-        if elev_max > 1e3:
-            print('Invalid elevation value')
+        u_max = float(numpy.max(u))
+
+        total_v = float(numpy.sum(elev + h)) * dx * dy
+        if initial_v is None:
+            initial_v = total_v
+        diff_v = total_v - initial_v
+
+        print(f'{i_export:2d} {i:4d} {t:.3f} elev={elev_max:7.5f} u={u_max:7.5f} dV={diff_v: 6.3e}')
+        if elev_max > 1e3 or not math.isfinite(elev_max):
+            print(f'Invalid elevation value: {elev_max}')
             break
         i_export += 1
         next_t_export = i_export * t_export
-        img.update({'array': elev})
-        fig.canvas.draw()
-        fig.canvas.flush_events()
+        if runtime_plot:
+            img.update({'array': elev.T})
+            fig.canvas.draw()
+            fig.canvas.flush_events()
 
     # SSPRK33 time integrator
     rhs(u, v, elev)
@@ -134,3 +159,10 @@ for i in range(nt+1):
     u[...] = u/3 + 2/3*(u2 + dt*dudt)
     v[...] = v/3 + 2/3*(v2 + dt*dvdt)
     elev[...] = elev/3 + 2/3*(elev2 + dt*delevdt)
+
+duration = time_mod.perf_counter() - tic
+print(f'Duration: {duration:.2f} s')
+
+if runtime_plot:
+    plt.ioff()
+    plt.show()
