@@ -1,4 +1,4 @@
-import numpy.array_api as numpy
+import numpy
 import matplotlib.pyplot as plt
 import math
 import time as time_mod
