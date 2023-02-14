@@ -93,8 +93,14 @@ def run(grid, initial_elev_func, exact_elev_func=None,
         v[...] = one_third*v + two_thirds*(v2 + dt*dvdt)
         elev[...] = one_third*elev + two_thirds*(elev2 + dt*delevdt)
 
+    if backend == 'ramba':
+        # warm jit cache
+        step(u, v, elev, u1, v1, elev1, u2, v2, elev2, dudt, dvdt, delevdt)
+
     # initial condition
     elev[...] = npx.asarray(initial_elev_func(grid))
+    u[...] = 0
+    v[...] = 0
 
     if runtime_plot:
         plt.ion()
