@@ -36,11 +36,14 @@ def initial_elev(grid):
               type=click.Choice(['numpy', 'ramba', 'numba', 'jax'],
                                 case_sensitive=False),
               help='Use given backend.')
+@click.option('-n', '--resolution', default=128,
+              type=click.IntRange(min=4, max_open=True), show_default=True,
+              help='Number of grid cells in x and y direction.')
 @click.option('-p', '--runtime-plot', is_flag=True, default=False,
               type=click.BOOL, show_default=True,
               help='Plot solution at runtime.')
 def main(**kwargs):
-    n = 128
+    n = kwargs.pop('resolution')
     model.run(
         n, n,
         initial_elev_func=initial_elev,
