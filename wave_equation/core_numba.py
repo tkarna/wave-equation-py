@@ -9,7 +9,8 @@ use_threading = False
 
 
 def run(grid, initial_elev_func, exact_elev_func=None,
-        t_end=1.0, t_export=0.02, dt=None, runtime_plot=False, vmax=0.5):
+        t_end=1.0, t_export=0.02, dt=None, ntimestep=None,
+        runtime_plot=False, vmax=0.5):
     """
     Run simulation.
     """
@@ -41,7 +42,11 @@ def run(grid, initial_elev_func, exact_elev_func=None,
         alpha = 0.5
         dt = alpha * grid.dx / c
         dt = t_export / int(math.ceil(t_export / dt))
-    nt = int(math.ceil(t_end / dt))
+    if ntimestep is not None:
+        nt = ntimestep
+        t_end = nt * dt
+    else:
+        nt = int(math.ceil(t_end / dt))
     print(f'Time step: {dt} s')
     print(f'Total run time: {t_end} s, {nt} time steps')
 
