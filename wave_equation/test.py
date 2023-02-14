@@ -32,7 +32,7 @@ def initial_elev(grid):
 
 
 @click.command()
-@click.option('-b', '--backend', type=click.Choice(['numpy', 'ramba'],
+@click.option('-b', '--backend', type=click.Choice(['numpy', 'ramba', 'numba'],
               case_sensitive=False), default='numpy', show_default=True,
               help='Use given backend.')
 @click.option('-p', '--runtime-plot', is_flag=True, default=False,

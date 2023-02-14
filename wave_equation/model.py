@@ -68,6 +68,8 @@ def run(nx, ny, initial_elev_func, exact_elev_func=None,
     if backend in ['numpy', 'ramba']:
         import core_numpy as core
         kwargs['backend'] = backend
+    elif backend == 'numba':
+        import core_numba as core
     else:
         raise ValueError(f'Unknown backend "{backend}"')
 
