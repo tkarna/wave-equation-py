@@ -62,7 +62,7 @@ class CGrid:
 
 
 def run(nx, ny, initial_elev_func, exact_elev_func=None,
-        t_end=1.0, t_export=0.02, runtime_plot=False):
+        t_end=1.0, t_export=0.02, runtime_plot=False, vmax=0.5):
     """
     Run simulation.
     """
@@ -125,7 +125,6 @@ def run(nx, ny, initial_elev_func, exact_elev_func=None,
     if runtime_plot:
         plt.ion()
         fig, ax = plt.subplots(nrows=1, ncols=1)
-        vmax = 0.5
         img = ax.pcolormesh(grid.x_u_1d, grid.y_v_1d, elev.T,
                             vmin=-vmax, vmax=vmax, cmap='RdBu_r')
         plt.colorbar(img, label='Elevation')
@@ -179,6 +178,7 @@ def run(nx, ny, initial_elev_func, exact_elev_func=None,
     duration = time_mod.perf_counter() - tic
     print(f'Duration: {duration:.2f} s')
 
+    err_L2 = None
     if exact_elev_func is not None:
         elev_exact = exact_elev_func(grid, t)
         err2 = (elev_exact - elev)**2 * grid.dx * grid.dy / grid.lx / grid.ly
@@ -188,11 +188,13 @@ def run(nx, ny, initial_elev_func, exact_elev_func=None,
     if runtime_plot:
         plt.ioff()
 
-        fig2, ax2 = plt.subplots(nrows=1, ncols=1)
-        vmax = 0.5
-        img2 = ax2.pcolormesh(grid.x_u_1d, grid.y_v_1d, elev_exact.T,
-                              vmin=-vmax, vmax=vmax, cmap='RdBu_r')
-        plt.colorbar(img2, label='Elevation')
-        ax2.set_title('Exact')
+        if exact_elev_func is not None:
+            fig2, ax2 = plt.subplots(nrows=1, ncols=1)
+            img2 = ax2.pcolormesh(grid.x_u_1d, grid.y_v_1d, elev_exact.T,
+                                  vmin=-vmax, vmax=vmax, cmap='RdBu_r')
+            plt.colorbar(img2, label='Elevation')
+            ax2.set_title('Exact')
 
         plt.show()
+
+    return duration, err_L2

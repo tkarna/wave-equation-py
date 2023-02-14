@@ -1,3 +1,6 @@
+"""
+Verify correctness with standing wave test case.
+"""
 import model
 import numpy
 import math
@@ -33,5 +36,5 @@ if __name__ == '__main__':
         n, n,
         initial_elev_func=initial_elev,
         exact_elev_func=exact_elev,
-        runtime_plot=True
+        runtime_plot=False
     )
