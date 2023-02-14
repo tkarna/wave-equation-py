@@ -70,6 +70,8 @@ def run(nx, ny, initial_elev_func, exact_elev_func=None,
         kwargs['backend'] = backend
     elif backend == 'numba':
         import core_numba as core
+    elif backend == 'jax':
+        import core_jax as core
     else:
         raise ValueError(f'Unknown backend "{backend}"')
 

@@ -53,9 +53,11 @@ def run_convergence(n, dt, refinement_list, show_plot=False, **kwargs):
     assert slope > 1.8, 'Too low convergence rate: {slope:0.2f}'
     print('PASSED')
 
+
 @click.command()
-@click.option('-b', '--backend', type=click.Choice(['numpy', 'ramba', 'numba'],
-              case_sensitive=False), default='numpy', show_default=True,
+@click.option('-b', '--backend', default='numpy', show_default=True,
+              type=click.Choice(['numpy', 'ramba', 'numba', 'jax'],
+                                case_sensitive=False),
               help='Use given backend.')
 @click.option('-p', '--show-plot', is_flag=True, default=False,
               type=click.BOOL, show_default=True,

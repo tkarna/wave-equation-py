@@ -17,8 +17,9 @@ def initial_elev(grid):
 
 
 @click.command()
-@click.option('-b', '--backend', type=click.Choice(['numpy', 'ramba', 'numba'],
-              case_sensitive=False), default='numpy', show_default=True,
+@click.option('-b', '--backend', default='numpy', show_default=True,
+              type=click.Choice(['numpy', 'ramba', 'numba', 'jax'],
+                                case_sensitive=False),
               help='Use given backend.')
 def main(**kwargs):
     n = 256
