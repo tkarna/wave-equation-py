@@ -22,9 +22,10 @@ def run(grid, initial_elev_func, exact_elev_func=None,
     h = constant.h
 
     # state variables
-    elev = npx.zeros(grid.T_shape, dtype=npx.float64)
-    u = npx.zeros(grid.U_shape, dtype=npx.float64)
-    v = npx.zeros(grid.V_shape, dtype=npx.float64)
+    dtype = npx.float64
+    elev = npx.zeros(grid.T_shape, dtype=dtype)
+    u = npx.zeros(grid.U_shape, dtype=dtype)
+    v = npx.zeros(grid.V_shape, dtype=dtype)
 
     # state for RK stages
     elev1 = npx.zeros_like(elev)
@@ -39,9 +40,6 @@ def run(grid, initial_elev_func, exact_elev_func=None,
     dvdt = npx.zeros_like(v)
     delevdt = npx.zeros_like(elev)
 
-    # initial condition
-    elev[...] = npx.asarray(initial_elev_func(grid))
-
     # time step
     if dt is None:
         c = math.sqrt(g*h)
@@ -52,7 +50,10 @@ def run(grid, initial_elev_func, exact_elev_func=None,
     print(f'Time step: {dt} s')
     print(f'Total run time: {t_end} s, {nt} time steps')
 
-    def rhs(u, v, elev):
+    dx = grid.dx
+    dy = grid.dy
+
+    def rhs(u, v, elev, dudt, dvdt, delevdt):
         """
         Evaluate right hand side of the equations
         """
@@ -60,18 +61,40 @@ def run(grid, initial_elev_func, exact_elev_func=None,
         # sign convention: positive on rhs
 
         # pressure gradient -g grad(elev)
-        dudt[1:-1, :] = -g * (elev[1:, :] - elev[:-1, :])/grid.dx
-        dvdt[:, 1:-1] = -g * (elev[:, 1:] - elev[:, :-1])/grid.dy
+        dudt[1:-1, :] = -g * (elev[1:, :] - elev[:-1, :])/dx
+        dvdt[:, 1:-1] = -g * (elev[:, 1:] - elev[:, :-1])/dy
 
         # periodic boundary
-        dudt[0, :] = - g * (elev[0, :] - elev[-1, :])/grid.dx
+        dudt[0, :] = - g * (elev[0, :] - elev[-1, :])/dx
         dudt[-1, :] = dudt[0, :]
-        dvdt[:, 0] = - g * (elev[:, 0] - elev[:, -1])/grid.dy
+        dvdt[:, 0] = - g * (elev[:, 0] - elev[:, -1])/dy
         dvdt[:, -1] = dvdt[:, 0]
 
         # velocity divergence -h div(u)
-        delevdt[...] = -h * ((u[1:, :] - u[:-1, :])/grid.dx +
-                             (v[:, 1:] - v[:, :-1])/grid.dy)
+        delevdt[...] = -h * ((u[1:, :] - u[:-1, :])/dx +
+                             (v[:, 1:] - v[:, :-1])/dy)
+
+    def step(u, v, elev, u1, v1, elev1, u2, v2, elev2, dudt, dvdt, delevdt):
+        """
+        Execute one SSPRK(3,3) time step
+        """
+        one_third = 1./3
+        two_thirds = 2./3
+        rhs(u, v, elev, dudt, dvdt, delevdt)
+        u1[...] = u + dt*dudt
+        v1[...] = v + dt*dvdt
+        elev1[...] = elev + dt*delevdt
+        rhs(u1, v1, elev1, dudt, dvdt, delevdt)
+        u2[...] = 0.75*u + 0.25*(u1 + dt*dudt)
+        v2[...] = 0.75*v + 0.25*(v1 + dt*dvdt)
+        elev2[...] = 0.75*elev + 0.25*(elev1 + dt*delevdt)
+        rhs(u2, v2, elev2, dudt, dvdt, delevdt)
+        u[...] = one_third*u + two_thirds*(u2 + dt*dudt)
+        v[...] = one_third*v + two_thirds*(v2 + dt*dvdt)
+        elev[...] = one_third*elev + two_thirds*(elev2 + dt*delevdt)
+
+    # initial condition
+    elev[...] = npx.asarray(initial_elev_func(grid))
 
     if runtime_plot:
         plt.ion()
@@ -112,19 +135,7 @@ def run(grid, initial_elev_func, exact_elev_func=None,
                 fig.canvas.draw()
                 fig.canvas.flush_events()
 
-        # SSPRK33 time integrator
-        rhs(u, v, elev)
-        u1[...] = u + dt*dudt
-        v1[...] = v + dt*dvdt
-        elev1[...] = elev + dt*delevdt
-        rhs(u1, v1, elev1)
-        u2[...] = 0.75*u + 0.25*(u1 + dt*dudt)
-        v2[...] = 0.75*v + 0.25*(v1 + dt*dvdt)
-        elev2[...] = 0.75*elev + 0.25*(elev1 + dt*delevdt)
-        rhs(u2, v2, elev2)
-        u[...] = u/3 + 2/3*(u2 + dt*dudt)
-        v[...] = v/3 + 2/3*(v2 + dt*dvdt)
-        elev[...] = elev/3 + 2/3*(elev2 + dt*delevdt)
+        step(u, v, elev, u1, v1, elev1, u2, v2, elev2, dudt, dvdt, delevdt)
 
     duration = time_mod.perf_counter() - tic
     print(f'Duration: {duration:.2f} s')
@@ -134,7 +145,7 @@ def run(grid, initial_elev_func, exact_elev_func=None,
         elev_exact = exact_elev_func(grid, t)
         err2 = (elev_exact - elev)**2 * grid.dx * grid.dy / grid.lx / grid.ly
         err_L2 = npx.sqrt(npx.sum(err2))
-        print(f'L2 error: {err_L2:5.3e}')
+        print(f'L2 error: {err_L2:7.5e}')
 
     if runtime_plot:
         plt.ioff()
