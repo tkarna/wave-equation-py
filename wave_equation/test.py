@@ -5,6 +5,7 @@ import model
 import numpy
 import math
 import constant
+import click
 
 
 def exact_elev(grid, t):
@@ -30,11 +31,22 @@ def initial_elev(grid):
     return exact_elev(grid, 0)
 
 
-if __name__ == '__main__':
+@click.command()
+@click.option('-b', '--backend', type=click.Choice(['numpy', 'ramba'],
+              case_sensitive=False), default='numpy', show_default=True,
+              help='Use given backend.')
+@click.option('-p', '--runtime-plot', is_flag=True, default=False,
+              type=click.BOOL, show_default=True,
+              help='Plot solution at runtime.')
+def main(**kwargs):
     n = 128
     model.run(
         n, n,
         initial_elev_func=initial_elev,
         exact_elev_func=exact_elev,
-        runtime_plot=False
+        **kwargs
     )
+
+
+if __name__ == '__main__':
+    main()

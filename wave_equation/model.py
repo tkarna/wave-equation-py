@@ -64,14 +64,19 @@ def run(nx, ny, initial_elev_func, exact_elev_func=None,
     """
     Run simulation.
     """
-    if backend == 'numpy':
+    kwargs = {}
+    if backend in ['numpy', 'ramba']:
         import core_numpy as core
+        kwargs['backend'] = backend
+    else:
+        raise ValueError(f'Unknown backend "{backend}"')
 
     grid = CGrid(nx, ny)
 
     out = core.run(
         grid, initial_elev_func, exact_elev_func=exact_elev_func,
         t_end=t_end, t_export=t_export, dt=dt,
-        runtime_plot=runtime_plot, vmax=vmax
+        runtime_plot=runtime_plot, vmax=vmax,
+        **kwargs
     )
     return out

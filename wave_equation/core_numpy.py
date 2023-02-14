@@ -1,38 +1,46 @@
-import numpy
 import constant
 import math
 import matplotlib.pyplot as plt
 import time as time_mod
+import numpy
 
 
 def run(grid, initial_elev_func, exact_elev_func=None,
-        t_end=1.0, t_export=0.02, dt=None, runtime_plot=False, vmax=0.5):
+        t_end=1.0, t_export=0.02, dt=None, runtime_plot=False, vmax=0.5,
+        backend='numpy'):
     """
     Run simulation.
     """
+    if backend == 'numpy':
+        import numpy as npx
+    elif backend == 'ramba':
+        import ramba as npx
+    else:
+        raise ValueError(f'Unknown backend "{backend}"')
+
     g = constant.g
     h = constant.h
 
     # state variables
-    elev = numpy.zeros(grid.T_shape, dtype=numpy.float64)
-    u = numpy.zeros(grid.U_shape, dtype=numpy.float64)
-    v = numpy.zeros(grid.V_shape, dtype=numpy.float64)
+    elev = npx.zeros(grid.T_shape, dtype=npx.float64)
+    u = npx.zeros(grid.U_shape, dtype=npx.float64)
+    v = npx.zeros(grid.V_shape, dtype=npx.float64)
 
     # state for RK stages
-    elev1 = numpy.zeros_like(elev)
-    elev2 = numpy.zeros_like(elev)
-    u1 = numpy.zeros_like(u)
-    u2 = numpy.zeros_like(u)
-    v1 = numpy.zeros_like(v)
-    v2 = numpy.zeros_like(v)
+    elev1 = npx.zeros_like(elev)
+    elev2 = npx.zeros_like(elev)
+    u1 = npx.zeros_like(u)
+    u2 = npx.zeros_like(u)
+    v1 = npx.zeros_like(v)
+    v2 = npx.zeros_like(v)
 
     # tendecies u += dt*dudt
-    dudt = numpy.zeros_like(u)
-    dvdt = numpy.zeros_like(v)
-    delevdt = numpy.zeros_like(elev)
+    dudt = npx.zeros_like(u)
+    dvdt = npx.zeros_like(v)
+    delevdt = npx.zeros_like(elev)
 
     # initial condition
-    elev[...] = initial_elev_func(grid)
+    elev[...] = npx.asarray(initial_elev_func(grid))
 
     # time step
     if dt is None:
@@ -68,7 +76,7 @@ def run(grid, initial_elev_func, exact_elev_func=None,
     if runtime_plot:
         plt.ion()
         fig, ax = plt.subplots(nrows=1, ncols=1)
-        img = ax.pcolormesh(grid.x_u_1d, grid.y_v_1d, elev.T,
+        img = ax.pcolormesh(grid.x_u_1d, grid.y_v_1d, numpy.asarray(elev.T),
                             vmin=-vmax, vmax=vmax, cmap='RdBu_r')
         plt.colorbar(img, label='Elevation')
         fig.canvas.draw()
@@ -84,10 +92,10 @@ def run(grid, initial_elev_func, exact_elev_func=None,
         t = i*dt
 
         if t >= next_t_export:
-            elev_max = float(numpy.max(elev))
-            u_max = float(numpy.max(u))
+            elev_max = float(npx.max(elev))
+            u_max = float(npx.max(u))
 
-            total_v = float(numpy.sum(elev + h)) * grid.dx * grid.dy
+            total_v = float(npx.sum(elev + h)) * grid.dx * grid.dy
             if initial_v is None:
                 initial_v = total_v
             diff_v = total_v - initial_v
@@ -100,7 +108,7 @@ def run(grid, initial_elev_func, exact_elev_func=None,
             i_export += 1
             next_t_export = i_export * t_export
             if runtime_plot:
-                img.update({'array': elev.T})
+                img.update({'array': numpy.asarray(elev.T)})
                 fig.canvas.draw()
                 fig.canvas.flush_events()
 
@@ -125,7 +133,7 @@ def run(grid, initial_elev_func, exact_elev_func=None,
     if exact_elev_func is not None:
         elev_exact = exact_elev_func(grid, t)
         err2 = (elev_exact - elev)**2 * grid.dx * grid.dy / grid.lx / grid.ly
-        err_L2 = numpy.sqrt(numpy.sum(err2))
+        err_L2 = npx.sqrt(npx.sum(err2))
         print(f'L2 error: {err_L2:5.3e}')
 
     if runtime_plot:

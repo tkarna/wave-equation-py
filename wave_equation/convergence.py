@@ -3,9 +3,10 @@ Verify correctness in convergence test.
 """
 from test import model, initial_elev, exact_elev
 import numpy
+import click
 
 
-def run_convergence(n, dt, refinement_list, show_plot=False):
+def run_convergence(n, dt, refinement_list, show_plot=False, **kwargs):
     dx_list = []
     er_list = []
     for r in refinement_list:
@@ -17,7 +18,8 @@ def run_convergence(n, dt, refinement_list, show_plot=False):
             initial_elev_func=initial_elev,
             exact_elev_func=exact_elev,
             dt=dt,
-            runtime_plot=False
+            runtime_plot=False,
+            **kwargs
         )
         er_list.append(er)
         dx_list.append(dx)
@@ -34,8 +36,6 @@ def run_convergence(n, dt, refinement_list, show_plot=False):
 
     slope, intercept = numpy.polyfit(dx_log, er_log, 1)
     print(f'Convergence rate: {slope:0.2f}')
-    assert slope > 1.8, 'Too low convergence rate: {slope:0.2f}'
-    print('PASSED')
 
     if show_plot:
         import matplotlib.pyplot as plt
@@ -50,10 +50,23 @@ def run_convergence(n, dt, refinement_list, show_plot=False):
         ax.grid(True)
         plt.show()
 
+    assert slope > 1.8, 'Too low convergence rate: {slope:0.2f}'
+    print('PASSED')
 
-if __name__ == '__main__':
+@click.command()
+@click.option('-b', '--backend', type=click.Choice(['numpy', 'ramba'],
+              case_sensitive=False), default='numpy', show_default=True,
+              help='Use given backend.')
+@click.option('-p', '--show-plot', is_flag=True, default=False,
+              type=click.BOOL, show_default=True,
+              help='Show convergence plot in the end.')
+def main(**kwargs):
     # base resolution
     n = 8
     dt = 2e-4  # small dt => spatial error dominates
     refinement_list = numpy.arange(0, 4)
-    run_convergence(n, dt, refinement_list, show_plot=False)
+    run_convergence(n, dt, refinement_list, **kwargs)
+
+
+if __name__ == '__main__':
+    main()

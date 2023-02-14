@@ -3,6 +3,7 @@ An example simulation with visualization.
 """
 import model
 import numpy
+import click
 
 
 def initial_elev(grid):
@@ -15,10 +16,19 @@ def initial_elev(grid):
     return amp * numpy.exp(-1.0 * dist2 / radius**2)
 
 
-if __name__ == '__main__':
+@click.command()
+@click.option('-b', '--backend', type=click.Choice(['numpy', 'ramba'],
+              case_sensitive=False), default='numpy', show_default=True,
+              help='Use given backend.')
+def main(**kwargs):
     n = 256
     model.run(
         n, n, t_end=1.6,
         initial_elev_func=initial_elev,
-        runtime_plot=True, vmax=0.2
+        runtime_plot=True, vmax=0.2,
+        **kwargs
     )
+
+
+if __name__ == '__main__':
+    main()
