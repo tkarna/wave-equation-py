@@ -62,7 +62,7 @@ class CGrid:
 
 
 def run(nx, ny, initial_elev_func, exact_elev_func=None,
-        t_end=1.0, t_export=0.02, runtime_plot=False, vmax=0.5):
+        t_end=1.0, t_export=0.02, dt=None, runtime_plot=False, vmax=0.5):
     """
     Run simulation.
     """
@@ -93,10 +93,11 @@ def run(nx, ny, initial_elev_func, exact_elev_func=None,
     elev[...] = initial_elev_func(grid)
 
     # time step
-    c = math.sqrt(g*h)
-    alpha = 0.5
-    dt = alpha * grid.dx / c
-    dt = t_export / int(math.ceil(t_export / dt))
+    if dt is None:
+        c = math.sqrt(g*h)
+        alpha = 0.5
+        dt = alpha * grid.dx / c
+        dt = t_export / int(math.ceil(t_export / dt))
     nt = int(math.ceil(t_end / dt))
     print(f'Time step: {dt} s')
     print(f'Total run time: {t_end} s, {nt} time steps')
@@ -182,7 +183,7 @@ def run(nx, ny, initial_elev_func, exact_elev_func=None,
     if exact_elev_func is not None:
         elev_exact = exact_elev_func(grid, t)
         err2 = (elev_exact - elev)**2 * grid.dx * grid.dy / grid.lx / grid.ly
-        err_L2 = numpy.sum(err2)
+        err_L2 = numpy.sqrt(numpy.sum(err2))
         print(f'L2 error: {err_L2:5.3e}')
 
     if runtime_plot:
