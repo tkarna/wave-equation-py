@@ -12,15 +12,19 @@ from test import initial_elev, exact_elev
               type=click.Choice(['numpy', 'ramba', 'numba', 'jax'],
                                 case_sensitive=False),
               help='Use given backend.')
+@click.option('-n', '--resolution', default=[128, 256, 512, 1024],
+              multiple=True,
+              type=click.IntRange(min=4, max_open=True), show_default=True,
+              help='Number of grid cells in x and y direction.')
 def main(**kwargs):
-    backend_list = kwargs.pop('backend')
+    backend_list = kwargs['backend']
     # numpy needs to run before numba
     ordered_list = ['numpy', 'numba', 'ramba', 'jax']
     backend_list = [b for b in ordered_list if b in backend_list]
     ntimestep = 200
     dt = 1e-4
     t_export = dt*50
-    reso_list = [128, 256, 512, 1024, 1536]
+    reso_list = kwargs['resolution']
 
     # run models
     timings = {}
@@ -46,10 +50,10 @@ def main(**kwargs):
     dofs_list = [r*r + 2 * r*(r+1) for r in reso_list]
 
     # print table
-    backend_cols = ' '.join(f'{b:7s}' for b in backend_list)
+    backend_cols = ' '.join(f'{b:8s}' for b in backend_list)
     print(f'size dofs     {backend_cols}')
     for r, dofs in zip(reso_list, dofs_list):
-        time_cols = ' '.join(f'{timings[(b, r)]:7.2e}'
+        time_cols = ' '.join(f'{timings[(b, r)]:8.2e}'
                              for b in backend_list)
         print(f'{r:4d} {dofs:8d} {time_cols}')
 
