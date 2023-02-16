@@ -66,8 +66,7 @@ def run(grid, initial_elev_func, bathymetry_func,
     dvdt = npx.zeros_like(v)
     delevdt = npx.zeros_like(elev)
 
-    # initial condition
-    elev[...] = initial_elev_func(grid.x_t_2d, grid.y_t_2d)
+    # set bathymetry
     h[...] = bathymetry_func(grid.x_t_2d, grid.y_t_2d)
     pe_offset = 0.5 * g * npx.mean(h**2)  # pe for elev=0
 
@@ -98,7 +97,7 @@ def run(grid, initial_elev_func, bathymetry_func,
         # potential energy, pe = 1/2 g (elev^2 - h^2) + offset
         pe[:, :] = 0.5 * g * (elev + h) * (elev - h) + pe_offset
 
-    def rhs(u, v, elev):
+    def rhs(u, v, elev, dudt, dvdt, delevdt):
         """
         Evaluate right hand side of the equations
         """
@@ -243,6 +242,34 @@ def run(grid, initial_elev_func, bathymetry_func,
             dudt[:, :] += -dkedx
             dvdt[:, :] += -dkedy
 
+    def step(u, v, elev, u1, v1, elev1, u2, v2, elev2, dudt, dvdt, delevdt):
+        """
+        Execute one SSPRK(3,3) time step
+        """
+        one_third = 1./3
+        two_thirds = 2./3
+        rhs(u, v, elev, dudt, dvdt, delevdt)
+        u1[...] = u + dt*dudt
+        v1[...] = v + dt*dvdt
+        elev1[...] = elev + dt*delevdt
+        rhs(u1, v1, elev1, dudt, dvdt, delevdt)
+        u2[...] = 0.75*u + 0.25*(u1 + dt*dudt)
+        v2[...] = 0.75*v + 0.25*(v1 + dt*dvdt)
+        elev2[...] = 0.75*elev + 0.25*(elev1 + dt*delevdt)
+        rhs(u2, v2, elev2, dudt, dvdt, delevdt)
+        u[...] = one_third*u + two_thirds*(u2 + dt*dudt)
+        v[...] = one_third*v + two_thirds*(v2 + dt*dvdt)
+        elev[...] = one_third*elev + two_thirds*(elev2 + dt*delevdt)
+
+    if backend == 'ramba':
+        # warm jit cache
+        step(u, v, elev, u1, v1, elev1, u2, v2, elev2, dudt, dvdt, delevdt)
+
+    # initial condition
+    elev[...] = npx.asarray(initial_elev_func(grid.x_t_2d, grid.y_t_2d))
+    u[...] = 0
+    v[...] = 0
+
     if runtime_plot:
         plt.ion()
         fig, ax_list = plt.subplots(nrows=1, ncols=2, sharey=True, figsize=(13, 5))
@@ -303,19 +330,7 @@ def run(grid, initial_elev_func, bathymetry_func,
                 fig.canvas.draw()
                 fig.canvas.flush_events()
 
-        # SSPRK33 time integrator
-        rhs(u, v, elev)
-        u1[...] = u + dt*dudt
-        v1[...] = v + dt*dvdt
-        elev1[...] = elev + dt*delevdt
-        rhs(u1, v1, elev1)
-        u2[...] = 0.75*u + 0.25*(u1 + dt*dudt)
-        v2[...] = 0.75*v + 0.25*(v1 + dt*dvdt)
-        elev2[...] = 0.75*elev + 0.25*(elev1 + dt*delevdt)
-        rhs(u2, v2, elev2)
-        u[...] = u/3 + 2/3*(u2 + dt*dudt)
-        v[...] = v/3 + 2/3*(v2 + dt*dvdt)
-        elev[...] = elev/3 + 2/3*(elev2 + dt*delevdt)
+        step(u, v, elev, u1, v1, elev1, u2, v2, elev2, dudt, dvdt, delevdt)
 
     duration = time_mod.perf_counter() - tic
     print(f'Duration: {duration:.2f} s')
