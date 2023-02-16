@@ -22,6 +22,10 @@ def bathymetry(x, y):
 
 
 @click.command()
+@click.option('-b', '--backend', default='numpy', show_default=True,
+              type=click.Choice(['numpy', 'ramba'],
+                                case_sensitive=False),
+              help='Use given backend.')
 @click.option('-n', '--resolution', default=128,
               type=click.IntRange(min=4, max_open=True), show_default=True,
               help='Number of grid cells in x and y direction.')
