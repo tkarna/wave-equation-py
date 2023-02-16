@@ -25,9 +25,9 @@ def main(**kwargs):
     # numpy needs to run before numba
     ordered_list = ['numpy', 'numba', 'ramba', 'jax']
     backend_list = [b for b in ordered_list if b in backend_list]
-    ntimestep = 200
-    dt = 1e-4
-    t_export = dt*50
+    ntimestep = 100
+    dt = 1e-5
+    t_export = dt*25
     reso_list = kwargs['resolution']
 
     # run models
