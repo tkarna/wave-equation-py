@@ -2,21 +2,39 @@ import constant
 import math
 import matplotlib.pyplot as plt
 import time as time_mod
-import numpy
+
+
+def jitme(backend):
+    """
+    Calls jitter of the used backend (if any)
+    """
+    if backend == 'numba':
+        from numba import jit
+        return jit(nopython=True, fastmath=True, parallel=False)
+    return lambda x: x
 
 
 def run(grid, initial_elev_func, bathymetry_func,
         exact_elev_func=None,
         t_end=1.0, t_export=0.02, dt=None, ntimestep=None,
         runtime_plot=False, plot_energy=False, vmax=0.5,
-        backend='numpy'):
+        backend='numba'):
     """
     Run simulation.
     """
-    if backend == 'numpy':
+    if backend in ['numpy', 'numba']:
         import numpy as npx
+
+        def to_numpy(x):
+            return x
+
     elif backend == 'ramba':
         import ramba as npx
+        import numpy
+
+        def to_numpy(x):
+            return numpy.asarray(x)
+
     else:
         raise ValueError(f'Unknown backend "{backend}"')
 
@@ -74,7 +92,16 @@ def run(grid, initial_elev_func, bathymetry_func,
     print(f'Time step: {dt} s')
     print(f'Total run time: {t_end} s, {nt} time steps')
 
-    def compute_energy(u, v, elev):
+    dx = grid.dx
+    dy = grid.dy
+    nx = grid.nx
+    ny = grid.ny
+    U_shape = grid.U_shape
+    V_shape = grid.V_shape
+    F_shape = grid.F_shape
+
+    @jitme(backend)
+    def compute_energy(u, v, elev, ke, pe):
         """
         Compute kinetic and potential energy from model state.
         """
@@ -87,7 +114,8 @@ def run(grid, initial_elev_func, bathymetry_func,
         # potential energy, pe = 1/2 g (elev^2 - h^2) + offset
         pe[:, :] = 0.5 * g * (elev + h) * (elev - h) + pe_offset
 
-    def rhs(u, v, elev, dudt, dvdt, delevdt):
+    @jitme(backend)
+    def rhs(u, v, elev, ke, pe, q, dudt, dvdt, delevdt):
         """
         Evaluate right hand side of the equations
         """
@@ -95,13 +123,13 @@ def run(grid, initial_elev_func, bathymetry_func,
         # sign convention: positive on rhs
 
         # pressure gradient -g grad(elev)
-        dudt[1:-1, :] = -g * (elev[1:, :] - elev[:-1, :])/grid.dx
-        dvdt[:, 1:-1] = -g * (elev[:, 1:] - elev[:, :-1])/grid.dy
+        dudt[1:-1, :] = -g * (elev[1:, :] - elev[:-1, :])/dx
+        dvdt[:, 1:-1] = -g * (elev[:, 1:] - elev[:, :-1])/dy
 
         # periodic boundary
-        dudt[0, :] = - g * (elev[0, :] - elev[-1, :])/grid.dx
+        dudt[0, :] = - g * (elev[0, :] - elev[-1, :])/dx
         dudt[-1, :] = dudt[0, :]
-        dvdt[:, 0] = - g * (elev[:, 0] - elev[:, -1])/grid.dy
+        dvdt[:, 0] = - g * (elev[:, 0] - elev[:, -1])/dy
         dvdt[:, -1] = dvdt[:, 0]
 
         # volume flux divergence -div(H u)
@@ -117,33 +145,33 @@ def run(grid, initial_elev_func, bathymetry_func,
         hv[:, 0] = 0.5 * (H[:, -1] + H[:, 0]) * v[:, 0]
         hv[:, -1] = hv[:, 0]
 
-        delevdt[...] = -((hu[1:, :] - hu[:-1, :])/grid.dx +
-                         (hv[:, 1:] - hv[:, :-1])/grid.dy)
+        delevdt[...] = -((hu[1:, :] - hu[:-1, :])/dx +
+                         (hv[:, 1:] - hv[:, :-1])/dy)
 
-        dudy = npx.zeros(grid.F_shape, dtype=dtype)  # F point (nx+1, nx+1)
-        dudy[:, 1:-1] = (u[:, 1:] - u[:, :-1])/grid.dy
-        dudy[:, 0] = (u[:, 0] - u[:, -1])/grid.dy
+        dudy = npx.zeros(F_shape, dtype=dtype)  # F point (nx+1, nx+1)
+        dudy[:, 1:-1] = (u[:, 1:] - u[:, :-1])/dy
+        dudy[:, 0] = (u[:, 0] - u[:, -1])/dy
         dudy[:, -1] = dudy[:, 0]
 
-        dvdx = npx.zeros(grid.F_shape, dtype=dtype)  # F point (nx+1, nx+1)
-        dvdx[1:-1, :] = (v[1:, :] - v[:-1, :])/grid.dx
-        dvdx[0, :] = (v[0, :] - v[-1, :])/grid.dx
+        dvdx = npx.zeros(F_shape, dtype=dtype)  # F point (nx+1, nx+1)
+        dvdx[1:-1, :] = (v[1:, :] - v[:-1, :])/dx
+        dvdx[0, :] = (v[0, :] - v[-1, :])/dx
         dvdx[-1, :] = dvdx[0, :]
 
-        compute_energy(u, v, elev)
+        compute_energy(u, v, elev, ke, pe)
 
         if not use_vector_invariant_form:
             # advection of momentum
             # dudt += U . grad(u) = u dudx + v dudy = uux + vuy
             # dvdt += U . grad(v) = u dvdx + v dvdy = uvx + vvy
-            dudx = npx.zeros((grid.nx + 2, grid.ny))  # T point extended for BC
-            dudx[1:-1, :] = (u[1:, :] - u[:-1, :])/grid.dx
-            dudx[0, :] = (u[0, :] - u[-1, :])/grid.dx
+            dudx = npx.zeros((nx + 2, ny))  # T point extended for BC
+            dudx[1:-1, :] = (u[1:, :] - u[:-1, :])/dx
+            dudx[0, :] = (u[0, :] - u[-1, :])/dx
             dudx[-1, :] = dudx[0, :]
             uux = npx.where(u > 0, dudx[:-1, :], dudx[1:, :]) * u
-            dvdy = npx.zeros((grid.nx, grid.ny + 2))  # T point extended for BC
-            dvdy[:, 1:-1] = (v[:, 1:] - v[:, :-1])/grid.dy
-            dvdy[:, 0] = (v[:, 0] - v[:, -1])/grid.dy
+            dvdy = npx.zeros((nx, ny + 2))  # T point extended for BC
+            dvdy[:, 1:-1] = (v[:, 1:] - v[:, :-1])/dy
+            dvdy[:, 0] = (v[:, 0] - v[:, -1])/dy
             dvdy[:, -1] = dvdy[:, 0]
             vvy = npx.where(v > 0, dvdy[:, :-1], dvdy[:, 1:]) * v
             v_at_u = npx.zeros_like(u)  # U point (nx+1, ny)
@@ -167,7 +195,7 @@ def run(grid, initial_elev_func, bathymetry_func,
 
         else:
             # total depth at F points
-            H_at_f = npx.zeros(grid.F_shape, dtype=dtype)
+            H_at_f = npx.zeros(F_shape, dtype=dtype)
             H_at_f[1:-1, 1:-1] = 0.25 * (
                 H[1:, 1:] + H[:-1, 1:] + H[1:, :-1] + H[:-1, :-1]
             )
@@ -198,7 +226,7 @@ def run(grid, initial_elev_func, bathymetry_func,
             q_d = w * (q[:-1, :-1] + q[:-1, 1:] + q[1:, :-1])
 
             # potential vorticity advection terms
-            qhv = npx.zeros(grid.U_shape, dtype=dtype)
+            qhv = npx.zeros(U_shape, dtype=dtype)
             qhv[:-1, :] += q_a[:, :] * hv[:, 1:]
             qhv[-1, :] += q_a[0, :] * hv[0, 1:]
             qhv[1:, :] += q_b[:, :] * hv[:, 1:]
@@ -207,7 +235,7 @@ def run(grid, initial_elev_func, bathymetry_func,
             qhv[0, :] += q_g[-1, :] * hv[-1, :-1]
             qhv[:-1, :] += q_d[:, :] * hv[:, :-1]
             qhv[-1, :] += q_d[0, :] * hv[0, :-1]
-            qhu = npx.zeros(grid.V_shape, dtype=dtype)
+            qhu = npx.zeros(V_shape, dtype=dtype)
             qhu[:, :-1] += q_g[:, :] * hu[1:, :]
             qhu[:, -1] += q_g[:, 0] * hu[1:, 0]
             qhu[:, :-1] += q_d[:, :] * hu[:-1, :]
@@ -221,40 +249,43 @@ def run(grid, initial_elev_func, bathymetry_func,
             dvdt[:, :] += -qhu
 
             # gradient of ke
-            dkedx = npx.zeros(grid.U_shape, dtype=dtype)
-            dkedx[1:-1, :] = (ke[1:, :] - ke[:-1, :])/grid.dx
-            dkedx[0, :] = (ke[0, :] - ke[-1, :])/grid.dx
+            dkedx = npx.zeros(U_shape, dtype=dtype)
+            dkedx[1:-1, :] = (ke[1:, :] - ke[:-1, :])/dx
+            dkedx[0, :] = (ke[0, :] - ke[-1, :])/dx
             dkedx[-1, :] = dkedx[0, :]
-            dkedy = npx.zeros(grid.V_shape, dtype=dtype)
-            dkedy[:, 1:-1] = (ke[:, 1:] - ke[:, :-1])/grid.dy
-            dkedy[:, 0] = (ke[:, 0] - ke[:, -1])/grid.dy
+            dkedy = npx.zeros(V_shape, dtype=dtype)
+            dkedy[:, 1:-1] = (ke[:, 1:] - ke[:, :-1])/dy
+            dkedy[:, 0] = (ke[:, 0] - ke[:, -1])/dy
             dkedy[:, -1] = dkedy[:, 0]
 
             dudt[:, :] += -dkedx
             dvdt[:, :] += -dkedy
 
-    def step(u, v, elev, u1, v1, elev1, u2, v2, elev2, dudt, dvdt, delevdt):
+    @jitme(backend)
+    def step(u, v, elev, u1, v1, elev1, u2, v2, elev2, ke, pe, q,
+             dudt, dvdt, delevdt):
         """
         Execute one SSPRK(3,3) time step
         """
         one_third = 1./3
         two_thirds = 2./3
-        rhs(u, v, elev, dudt, dvdt, delevdt)
+        rhs(u, v, elev, ke, pe, q, dudt, dvdt, delevdt)
         u1[...] = u + dt*dudt
         v1[...] = v + dt*dvdt
         elev1[...] = elev + dt*delevdt
-        rhs(u1, v1, elev1, dudt, dvdt, delevdt)
+        rhs(u1, v1, elev1, ke, pe, q, dudt, dvdt, delevdt)
         u2[...] = 0.75*u + 0.25*(u1 + dt*dudt)
         v2[...] = 0.75*v + 0.25*(v1 + dt*dvdt)
         elev2[...] = 0.75*elev + 0.25*(elev1 + dt*delevdt)
-        rhs(u2, v2, elev2, dudt, dvdt, delevdt)
+        rhs(u2, v2, elev2, ke, pe, q, dudt, dvdt, delevdt)
         u[...] = one_third*u + two_thirds*(u2 + dt*dudt)
         v[...] = one_third*v + two_thirds*(v2 + dt*dvdt)
         elev[...] = one_third*elev + two_thirds*(elev2 + dt*delevdt)
 
-    if backend == 'ramba':
+    if backend in ['ramba', 'numba']:
         # warm jit cache
-        step(u, v, elev, u1, v1, elev1, u2, v2, elev2, dudt, dvdt, delevdt)
+        step(u, v, elev, u1, v1, elev1, u2, v2, elev2, ke, pe, q,
+             dudt, dvdt, delevdt)
 
     # initial condition
     elev[...] = npx.asarray(initial_elev_func(grid.x_t_2d, grid.y_t_2d))
@@ -268,7 +299,7 @@ def run(grid, initial_elev_func, bathymetry_func,
         ax = ax_list[0]
         vmax = 0.15
         img1 = ax.pcolormesh(
-            grid.x_u_1d, grid.y_v_1d, numpy.asarray(elev.T),
+            grid.x_u_1d, grid.y_v_1d, to_numpy(elev.T),
             vmin=-vmax, vmax=vmax, cmap=plt.get_cmap('RdBu_r', 61)
         )
         plt.colorbar(img1, label='Elevation')
@@ -277,7 +308,7 @@ def run(grid, initial_elev_func, bathymetry_func,
         vmax = 0.7
         u_at_t = 0.5 * (u[1:, :] + u[:-1, :])
         img2 = ax.pcolormesh(
-            grid.x_u_1d, grid.y_v_1d, numpy.asarray(u_at_t.T),
+            grid.x_u_1d, grid.y_v_1d, to_numpy(u_at_t.T),
             vmin=-vmax, vmax=vmax, cmap=plt.get_cmap('RdBu_r', 61)
         )
         plt.colorbar(img2, label='X Velocity')
@@ -289,7 +320,7 @@ def run(grid, initial_elev_func, bathymetry_func,
     t = 0
     i_export = 0
     next_t_export = 0
-    compute_energy(u, v, elev)
+    compute_energy(u, v, elev, ke, pe)
     diff_e = None
     diff_v = None
     ene_series = []
@@ -327,14 +358,15 @@ def run(grid, initial_elev_func, bathymetry_func,
             i_export += 1
             next_t_export = i_export * t_export
             if runtime_plot:
-                img1.update({'array': numpy.asarray(elev.T)})
+                img1.update({'array': to_numpy(elev.T)})
                 img2.update(
-                    {'array': numpy.asarray(0.5*(u[1:, :] + u[:-1, :])).T}
+                    {'array': to_numpy(0.5*(u[1:, :] + u[:-1, :])).T}
                 )
                 fig.canvas.draw()
                 fig.canvas.flush_events()
 
-        step(u, v, elev, u1, v1, elev1, u2, v2, elev2, dudt, dvdt, delevdt)
+        step(u, v, elev, u1, v1, elev1, u2, v2, elev2, ke, pe, q,
+             dudt, dvdt, delevdt)
 
     duration = time_mod.perf_counter() - tic
     print(f'Duration: {duration:.2f} s')

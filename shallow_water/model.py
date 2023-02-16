@@ -62,8 +62,8 @@ def run(nx, ny, initial_elev_func, bathymetry_func,
     """
     Run simulation.
     """
-    if backend in ['numpy', 'ramba']:
-        import core_numpy as core
+    if backend in ['numpy', 'ramba', 'numba']:
+        import core_default as core
         kwargs['backend'] = backend
     else:
         raise ValueError(f'Unknown backend "{backend}"')
