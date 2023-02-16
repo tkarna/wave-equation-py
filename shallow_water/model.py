@@ -65,6 +65,8 @@ def run(nx, ny, initial_elev_func, bathymetry_func,
     if backend in ['numpy', 'ramba', 'numba']:
         import core_default as core
         kwargs['backend'] = backend
+    elif backend == 'jax':
+        import core_jax as core
     else:
         raise ValueError(f'Unknown backend "{backend}"')
 

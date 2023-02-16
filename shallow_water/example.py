@@ -23,7 +23,7 @@ def bathymetry(x, y):
 
 @click.command()
 @click.option('-b', '--backend', default='numpy', show_default=True,
-              type=click.Choice(['numpy', 'ramba', 'numba'],
+              type=click.Choice(['numpy', 'ramba', 'numba', 'jax'],
                                 case_sensitive=False),
               help='Use given backend.')
 @click.option('-n', '--resolution', default=128,
