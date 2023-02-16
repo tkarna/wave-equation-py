@@ -136,8 +136,8 @@ def run(grid, initial_elev_func, bathymetry_func,
         H = elev + h
 
         # Hu flux using mean H
-        hu = npx.zeros_like(u)
-        hv = npx.zeros_like(v)
+        hu = npx.zeros(U_shape, dtype=dtype)
+        hv = npx.zeros(V_shape, dtype=dtype)
         hu[1:-1, :] = 0.5 * (H[:-1, :] + H[1:, :]) * u[1:-1, :]
         hu[0, :] = 0.5 * (H[-1, :] + H[0, :]) * u[0, :]
         hu[-1, :] = hu[0, :]
@@ -174,12 +174,12 @@ def run(grid, initial_elev_func, bathymetry_func,
             dvdy[:, 0] = (v[:, 0] - v[:, -1])/dy
             dvdy[:, -1] = dvdy[:, 0]
             vvy = npx.where(v > 0, dvdy[:, :-1], dvdy[:, 1:]) * v
-            v_at_u = npx.zeros_like(u)  # U point (nx+1, ny)
+            v_at_u = npx.zeros(U_shape, dtype=dtype)  # U point (nx+1, ny)
             v_av_y = 0.5 * (v[:, 1:] + v[:, :-1])
             v_at_u[1:-1, :] = 0.5 * (v_av_y[1:, :] + v_av_y[:-1, :])
             v_at_u[0, :] = 0.5 * (v_av_y[0, :] + v_av_y[-1, :])
             v_at_u[-1, :] = v_at_u[0, :]
-            u_at_v = npx.zeros_like(v)  # V point (nx, ny+1)
+            u_at_v = npx.zeros(V_shape, dtype=dtype)  # V point (nx, ny+1)
             u_av_x = 0.5 * (u[1:, :] + u[:-1, :])
             u_at_v[:, 1:-1] = 0.5 * (u_av_x[:, 1:] + u_av_x[:, :-1])
             u_at_v[:, 0] = 0.5 * (u_av_x[:, 0] + u_av_x[:, -1])
