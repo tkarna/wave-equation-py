@@ -47,12 +47,6 @@ def run(grid, initial_elev_func, bathymetry_func,
     hu = npx.zeros_like(u)
     hv = npx.zeros_like(v)
 
-    # for advection term
-    uux = npx.zeros_like(u)
-    vuy = npx.zeros_like(u)
-    uvx = npx.zeros_like(v)
-    vvy = npx.zeros_like(v)
-
     # state for RK stages
     elev1 = npx.zeros_like(elev)
     elev2 = npx.zeros_like(elev)
@@ -148,12 +142,12 @@ def run(grid, initial_elev_func, bathymetry_func,
             dudx[1:-1, :] = (u[1:, :] - u[:-1, :])/grid.dx
             dudx[0, :] = (u[0, :] - u[-1, :])/grid.dx
             dudx[-1, :] = dudx[0, :]
-            uux[:, :] = npx.where(u > 0, dudx[:-1, :], dudx[1:, :]) * u
+            uux = npx.where(u > 0, dudx[:-1, :], dudx[1:, :]) * u
             dvdy = npx.zeros((grid.nx, grid.ny + 2))  # T point extended for BC
             dvdy[:, 1:-1] = (v[:, 1:] - v[:, :-1])/grid.dy
             dvdy[:, 0] = (v[:, 0] - v[:, -1])/grid.dy
             dvdy[:, -1] = dvdy[:, 0]
-            vvy[:, :] = npx.where(v > 0, dvdy[:, :-1], dvdy[:, 1:]) * v
+            vvy = npx.where(v > 0, dvdy[:, :-1], dvdy[:, 1:]) * v
             v_at_u = npx.zeros_like(u)  # U point (nx+1, ny)
             v_av_y = 0.5 * (v[:, 1:] + v[:, :-1])
             v_at_u[1:-1, :] = 0.5 * (v_av_y[1:, :] + v_av_y[:-1, :])
@@ -164,10 +158,8 @@ def run(grid, initial_elev_func, bathymetry_func,
             u_at_v[:, 1:-1] = 0.5 * (u_av_x[:, 1:] + u_av_x[:, :-1])
             u_at_v[:, 0] = 0.5 * (u_av_x[:, 0] + u_av_x[:, -1])
             u_at_v[:, -1] = u_at_v[:, 0]
-            vuy[:, :] = npx.where(v_at_u > 0,
-                                  dudy[:, :-1], dudy[:, 1:]) * v_at_u
-            uvx[:, :] = npx.where(u_at_v > 0,
-                                  dvdx[:-1, :], dvdx[1:, :]) * u_at_v
+            vuy = npx.where(v_at_u > 0, dudy[:, :-1], dudy[:, 1:]) * v_at_u
+            uvx = npx.where(u_at_v > 0, dvdx[:-1, :], dvdx[1:, :]) * u_at_v
             dudt[:, :] += -uux - vuy
             dvdt[:, :] += -uvx - vvy
 
