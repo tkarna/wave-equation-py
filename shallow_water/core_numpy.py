@@ -117,14 +117,6 @@ def run(grid, initial_elev_func, bathymetry_func,
         # volume flux divergence -div(H u)
         H = elev + h
 
-        # compute upwind Hu flux at U and V points
-        # hu[1:-1, :] = npx.where(u[1:-1, :] > 0, H[:-1, :], H[1:, :]) * u[1:-1, :]
-        # hu[0, :] = npx.where(u[0, :] > 0, H[-1, :], H[0, :]) * u[0, :]
-        # hu[-1, :] = npx.where(u[-1, :] > 0, H[-1, :], H[0, :]) * u[-1, :]
-        # hv[:, 1:-1] = npx.where(v[:, 1:-1] > 0, H[:, :-1], H[:, 1:]) * v[:, 1:-1]
-        # hv[:, 0] = npx.where(v[:, 0] > 0, H[:, -1], H[:, 0]) * v[:, 0]
-        # hv[:, -1] = npx.where(v[:, -1] > 0, H[:, -1], H[:, 0]) * v[:, -1]
-
         # Hu flux using mean H
         hu[1:-1, :] = 0.5 * (H[:-1, :] + H[1:, :]) * u[1:-1, :]
         hu[0, :] = 0.5 * (H[-1, :] + H[0, :]) * u[0, :]
@@ -133,7 +125,8 @@ def run(grid, initial_elev_func, bathymetry_func,
         hv[:, 0] = 0.5 * (H[:, -1] + H[:, 0]) * v[:, 0]
         hv[:, -1] = hv[:, 0]
 
-        delevdt[...] = -((hu[1:, :] - hu[:-1, :])/grid.dx + (hv[:, 1:] - hv[:, :-1])/grid.dy)
+        delevdt[...] = -((hu[1:, :] - hu[:-1, :])/grid.dx +
+                         (hv[:, 1:] - hv[:, :-1])/grid.dy)
 
         dudy = npx.zeros(grid.F_shape, dtype=dtype)  # F point (nx+1, nx+1)
         dudy[:, 1:-1] = (u[:, 1:] - u[:, :-1])/grid.dy
@@ -171,8 +164,10 @@ def run(grid, initial_elev_func, bathymetry_func,
             u_at_v[:, 1:-1] = 0.5 * (u_av_x[:, 1:] + u_av_x[:, :-1])
             u_at_v[:, 0] = 0.5 * (u_av_x[:, 0] + u_av_x[:, -1])
             u_at_v[:, -1] = u_at_v[:, 0]
-            vuy[:, :] = npx.where(v_at_u > 0, dudy[:, :-1], dudy[:, 1:]) * v_at_u
-            uvx[:, :] = npx.where(u_at_v > 0, dvdx[:-1, :], dvdx[1:, :]) * u_at_v
+            vuy[:, :] = npx.where(v_at_u > 0,
+                                  dudy[:, :-1], dudy[:, 1:]) * v_at_u
+            uvx[:, :] = npx.where(u_at_v > 0,
+                                  dvdx[:-1, :], dvdx[1:, :]) * u_at_v
             dudt[:, :] += -uux - vuy
             dvdt[:, :] += -uvx - vvy
 
@@ -183,10 +178,16 @@ def run(grid, initial_elev_func, bathymetry_func,
         else:
             # total depth at F points
             H_at_f = npx.zeros(grid.F_shape, dtype=dtype)
-            H_at_f[1:-1, 1:-1] = 0.25 * (H[1:, 1:] + H[:-1, 1:] + H[1:, :-1] + H[:-1, :-1])
-            H_at_f[0, 1:-1] = 0.25 * (H[0, 1:] + H[-1, 1:] + H[0, :-1] + H[-1, :-1])
+            H_at_f[1:-1, 1:-1] = 0.25 * (
+                H[1:, 1:] + H[:-1, 1:] + H[1:, :-1] + H[:-1, :-1]
+            )
+            H_at_f[0, 1:-1] = 0.25 * (
+                H[0, 1:] + H[-1, 1:] + H[0, :-1] + H[-1, :-1]
+            )
             H_at_f[-1, 1:-1] = H_at_f[0, 1:-1]
-            H_at_f[1:-1, 0] = 0.25 * (H[1:, 0] + H[:-1, 0] + H[1:, -1] + H[:-1, -1])
+            H_at_f[1:-1, 0] = 0.25 * (
+                H[1:, 0] + H[:-1, 0] + H[1:, -1] + H[:-1, -1]
+            )
             H_at_f[1:-1, -1] = H_at_f[1:-1, 0]
             H_at_f[0, 0] = 0.25 * (H[0, 0] + H[-1, 0] + H[0, -1] + H[-1, -1])
             H_at_f[0, -1] = H_at_f[-1, 0] = H_at_f[-1, -1] = H_at_f[0, 0]
@@ -272,16 +273,23 @@ def run(grid, initial_elev_func, bathymetry_func,
 
     if runtime_plot:
         plt.ion()
-        fig, ax_list = plt.subplots(nrows=1, ncols=2, sharey=True, figsize=(13, 5))
+        fig, ax_list = plt.subplots(nrows=1, ncols=2,
+                                    sharey=True, figsize=(13, 5))
         ax = ax_list[0]
         vmax = 0.15
-        img1 = ax.pcolormesh(grid.x_u_1d, grid.y_v_1d, numpy.asarray(elev.T), vmin=-vmax, vmax=vmax, cmap=plt.get_cmap('RdBu_r', 61))
+        img1 = ax.pcolormesh(
+            grid.x_u_1d, grid.y_v_1d, numpy.asarray(elev.T),
+            vmin=-vmax, vmax=vmax, cmap=plt.get_cmap('RdBu_r', 61)
+        )
         plt.colorbar(img1, label='Elevation')
         ax.set_aspect('equal')
         ax = ax_list[1]
         vmax = 0.7
         u_at_t = 0.5 * (u[1:, :] + u[:-1, :])
-        img2 = ax.pcolormesh(grid.x_u_1d, grid.y_v_1d, numpy.asarray(u_at_t.T), vmin=-vmax, vmax=vmax, cmap=plt.get_cmap('RdBu_r', 61))
+        img2 = ax.pcolormesh(
+            grid.x_u_1d, grid.y_v_1d, numpy.asarray(u_at_t.T),
+            vmin=-vmax, vmax=vmax, cmap=plt.get_cmap('RdBu_r', 61)
+        )
         plt.colorbar(img2, label='X Velocity')
         ax.set_aspect('equal')
         fig.tight_layout()
@@ -317,7 +325,11 @@ def run(grid, initial_elev_func, bathymetry_func,
             diff_v = total_v - initial_v
             ene_series.append([total_pe, total_ke, total_e])
 
-            print(f'{i_export:2d} {i:4d} {t:.3f} elev={elev_max:7.5f} u={u_max:7.5f} q={q_max:8.5f} dV={diff_v: 6.3e} PE={total_pe:5.3f} KE={total_ke:5.3f} dE={diff_e: 6.3e}')
+            print(
+                f'{i_export:2d} {i:4d} {t:.3f} elev={elev_max:7.5f} '
+                f'u={u_max:7.5f} q={q_max:8.5f} dV={diff_v: 6.3e} '
+                f'PE={total_pe:5.3f} KE={total_ke:5.3f} dE={diff_e: 6.3e}'
+            )
 
             if elev_max > 1e3 or not math.isfinite(elev_max):
                 print(f'Invalid elevation value: {elev_max}')
@@ -326,7 +338,9 @@ def run(grid, initial_elev_func, bathymetry_func,
             next_t_export = i_export * t_export
             if runtime_plot:
                 img1.update({'array': numpy.asarray(elev.T)})
-                img2.update({'array': numpy.asarray(0.5*(u[1:, :] + u[:-1, :])).T})
+                img2.update(
+                    {'array': numpy.asarray(0.5*(u[1:, :] + u[:-1, :])).T}
+                )
                 fig.canvas.draw()
                 fig.canvas.flush_events()
 
