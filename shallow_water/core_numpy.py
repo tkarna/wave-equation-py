@@ -43,10 +43,6 @@ def run(grid, initial_elev_func, bathymetry_func,
     # bathymetry
     h = npx.zeros(grid.T_shape, dtype=dtype)
 
-    # volume fluxes
-    hu = npx.zeros_like(u)
-    hv = npx.zeros_like(v)
-
     # state for RK stages
     elev1 = npx.zeros_like(elev)
     elev2 = npx.zeros_like(elev)
@@ -112,6 +108,8 @@ def run(grid, initial_elev_func, bathymetry_func,
         H = elev + h
 
         # Hu flux using mean H
+        hu = npx.zeros_like(u)
+        hv = npx.zeros_like(v)
         hu[1:-1, :] = 0.5 * (H[:-1, :] + H[1:, :]) * u[1:-1, :]
         hu[0, :] = 0.5 * (H[-1, :] + H[0, :]) * u[0, :]
         hu[-1, :] = hu[0, :]
