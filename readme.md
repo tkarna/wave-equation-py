@@ -8,8 +8,8 @@ Solves the linear wave equations for water elevation, $\eta$, and depth-averaged
 $u$ and $v$ are the $x$ and $y$ components, respectively.
 
 $$\begin{eqnarray}
-\frac{\partial\eta}{\partial t} + h \nabla\cdot(\bar{u}) = 0 \\
-\frac{\partial\bar{u}}{\partial t} + g \nabla(\eta) = 0
+\frac{\partial\eta}{\partial t} + h \nabla\cdot(\bar{u}) &=& 0 \\
+\frac{\partial\bar{u}}{\partial t} + g \nabla(\eta) &=& 0
 \end{eqnarray}$$
 
 where $h$ and $g$ stand for the water depth and gravitational acceleration, respectively.
