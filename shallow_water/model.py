@@ -57,7 +57,7 @@ class CGrid:
         print(f'Total     DOFs: {self.dofs_T + self.dofs_U + self.dofs_V}')
 
 
-def run(nx, ny, initial_elev_func, bathymetry_func,
+def run(nx, ny, initial_solution_func, bathymetry_func,
         backend='numpy', **kwargs):
     """
     Run simulation.
@@ -74,7 +74,7 @@ def run(nx, ny, initial_elev_func, bathymetry_func,
     grid = CGrid(nx, ny)
 
     out = core.run(
-        grid, initial_elev_func, bathymetry_func,
+        grid, initial_solution_func, bathymetry_func,
         **kwargs
     )
     return out

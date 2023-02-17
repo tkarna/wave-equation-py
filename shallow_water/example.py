@@ -6,19 +6,22 @@ import numpy
 import click
 
 
-def initial_elev(x, y):
-    """Set initial condition for water elevation"""
+def initial_solution(grid):
+    """Set initial condition for u, v, elevation"""
     amp = 0.5
     radius = 0.3
     x0 = 0.0
     y0 = 0.0
-    dist2 = (x - x0)**2 + (y - y0)**2
-    return amp * numpy.exp(-1.0 * dist2 / radius**2)
+    dist2 = (grid.x_t_2d - x0)**2 + (grid.y_t_2d - y0)**2
+    elev = amp * numpy.exp(-1.0 * dist2 / radius**2)
+    u = numpy.zeros(grid.U_shape, dtype=elev.dtype)
+    v = numpy.zeros(grid.V_shape, dtype=elev.dtype)
+    return u, v, elev
 
 
-def bathymetry(x, y):
+def bathymetry(grid):
     """Expression for bathymetry"""
-    return 1.0 + numpy.exp(-(x**2/0.4))
+    return 1.0 + numpy.exp(-(grid.x_t_2d**2/0.4))
 
 
 @click.command()
@@ -33,7 +36,7 @@ def main(**kwargs):
     n = kwargs.pop('resolution')
     model.run(
         n, n,
-        initial_elev_func=initial_elev,
+        initial_solution_func=initial_solution,
         bathymetry_func=bathymetry,
         t_end=1.0,
         runtime_plot=True, plot_energy=True,

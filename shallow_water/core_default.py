@@ -14,7 +14,7 @@ def jitme(backend):
     return lambda x: x
 
 
-def run(grid, initial_elev_func, bathymetry_func,
+def run(grid, initial_solution_func, bathymetry_func,
         exact_elev_func=None,
         t_end=1.0, t_export=0.02, dt=None, ntimestep=None,
         runtime_plot=False, plot_energy=False, vmax=0.5,
@@ -75,7 +75,7 @@ def run(grid, initial_elev_func, bathymetry_func,
     delevdt = npx.zeros_like(elev)
 
     # set bathymetry
-    h[...] = bathymetry_func(grid.x_t_2d, grid.y_t_2d)
+    h[...] = bathymetry_func(grid)
     pe_offset = 0.5 * g * npx.mean(h**2)  # pe for elev=0
 
     # time step
@@ -288,9 +288,10 @@ def run(grid, initial_elev_func, bathymetry_func,
              dudt, dvdt, delevdt)
 
     # initial condition
-    elev[...] = npx.asarray(initial_elev_func(grid.x_t_2d, grid.y_t_2d))
-    u[...] = 0
-    v[...] = 0
+    initial_sol = initial_solution_func(grid)
+    u[...] = npx.asarray(initial_sol[0])
+    v[...] = npx.asarray(initial_sol[1])
+    elev[...] = npx.asarray(initial_sol[2])
 
     if runtime_plot:
         plt.ion()
