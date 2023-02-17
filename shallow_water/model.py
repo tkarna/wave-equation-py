@@ -41,6 +41,10 @@ class CGrid:
         # coordinates of U and V points (edge centers)
         self.x_u_1d = numpy.linspace(self.xlim[0], self.xlim[1], nx + 1)
         self.y_v_1d = numpy.linspace(self.ylim[0], self.ylim[1], ny + 1)
+        self.x_u_2d, self.y_u_2d = numpy.meshgrid(self.x_u_1d, self.y_t_1d,
+                                                  indexing='ij')
+        self.x_v_2d, self.y_v_2d = numpy.meshgrid(self.x_t_1d, self.y_v_1d,
+                                                  indexing='ij')
 
         self.T_shape = (nx, ny)
         self.U_shape = (nx + 1, ny)

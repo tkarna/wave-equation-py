@@ -7,9 +7,10 @@ import os
 
 
 def run(grid, initial_solution_func, bathymetry_func,
-        exact_elev_func=None,
+        exact_solution_func=None,
         t_end=1.0, t_export=0.02, dt=None, ntimestep=None,
-        runtime_plot=False, plot_energy=False, vmax=0.5):
+        runtime_plot=False, plot_energy=False,
+        vmax=0.15, umax=0.7):
     """
     Run simulation.
     """
@@ -298,7 +299,6 @@ def run(grid, initial_solution_func, bathymetry_func,
         fig, ax_list = plt.subplots(nrows=1, ncols=2,
                                     sharey=True, figsize=(13, 5))
         ax = ax_list[0]
-        vmax = 0.15
         img1 = ax.pcolormesh(
             grid.x_u_1d, grid.y_v_1d, elev.T,
             vmin=-vmax, vmax=vmax, cmap=plt.get_cmap('RdBu_r', 61)
@@ -306,11 +306,10 @@ def run(grid, initial_solution_func, bathymetry_func,
         plt.colorbar(img1, label='Elevation')
         ax.set_aspect('equal')
         ax = ax_list[1]
-        vmax = 0.7
         u_at_t = 0.5 * (u[1:, :] + u[:-1, :])
         img2 = ax.pcolormesh(
             grid.x_u_1d, grid.y_v_1d, u_at_t.T,
-            vmin=-vmax, vmax=vmax, cmap=plt.get_cmap('RdBu_r', 61)
+            vmin=-umax, vmax=umax, cmap=plt.get_cmap('RdBu_r', 61)
         )
         plt.colorbar(img2, label='X Velocity')
         ax.set_aspect('equal')
@@ -372,9 +371,9 @@ def run(grid, initial_solution_func, bathymetry_func,
     print(f'Duration: {duration:.2f} s')
 
     err_L2 = None
-    if exact_elev_func is not None:
-        elev_exact = exact_elev_func(grid, t)
-        err2 = (elev_exact - elev)**2 * grid.dx * grid.dy / grid.lx / grid.ly
+    if exact_solution_func is not None:
+        exact_sol = exact_solution_func(grid, t)
+        err2 = (exact_sol[2] - elev)**2 * grid.dx * grid.dy / grid.lx / grid.ly
         err_L2 = npx.sqrt(npx.sum(err2))
         print(f'L2 error: {err_L2:7.5e}')
 
