@@ -23,7 +23,7 @@ class CGrid:
         if ylim is None:
             ylim = [-1, 1]
         self.nx = nx
-        self.ny = nx
+        self.ny = ny
         self.xlim = xlim
         self.ylim = ylim
         self.lx = self.xlim[1] - self.xlim[0]
