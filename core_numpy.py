@@ -125,7 +125,7 @@ def run(grid, initial_elev_func, exact_elev_func=None,
 
         t = i*dt
 
-        if t >= next_t_export:
+        if t >= next_t_export - 1e-8:
             elev_max = float(npx.max(elev))
             u_max = float(npx.max(u))
 
