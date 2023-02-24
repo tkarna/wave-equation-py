@@ -7,7 +7,7 @@ from test import initial_elev, exact_elev
 
 
 @click.command()
-@click.option('-b', '--backend', default=['numpy', 'ramba', 'numba', 'jax'],
+@click.option('-b', '--backend', default=['numpy', 'ramba', 'numba', 'jax', 'jax-gpu'],
               multiple=True, show_default=True,
               type=click.Choice(['numpy', 'ramba', 'numba', 'jax'],
                                 case_sensitive=False),
@@ -23,7 +23,7 @@ def main(**kwargs):
     backend_list = kwargs['backend']
     generate_plot = kwargs['generate_plot']
     # numpy needs to run before numba
-    ordered_list = ['numpy', 'numba', 'ramba', 'jax']
+    ordered_list = ['numpy', 'numba', 'ramba', 'jax', 'jax-gpu']
     backend_list = [b for b in ordered_list if b in backend_list]
     ntimestep = 100
     dt = 1e-5

@@ -70,8 +70,10 @@ def run(nx, ny, initial_elev_func, exact_elev_func=None,
         kwargs['backend'] = backend
     elif backend == 'numba':
         import core_numba as core
-    elif backend == 'jax':
+    elif backend in ['jax', 'jax-gpu']:
+        device = 'gpu' if backend == 'jax-gpu' else 'cpu'
         import core_jax as core
+        kwargs['device'] = device
     else:
         raise ValueError(f'Unknown backend "{backend}"')
 

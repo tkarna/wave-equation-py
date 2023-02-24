@@ -18,7 +18,7 @@ def initial_elev(grid):
 
 @click.command()
 @click.option('-b', '--backend', default='numpy', show_default=True,
-              type=click.Choice(['numpy', 'ramba', 'numba', 'jax'],
+              type=click.Choice(['numpy', 'ramba', 'numba', 'jax', 'jax-gpu'],
                                 case_sensitive=False),
               help='Use given backend.')
 @click.option('-n', '--resolution', default=128,

@@ -8,21 +8,29 @@ import os
 
 def run(grid, initial_elev_func, exact_elev_func=None,
         t_end=1.0, t_export=0.02, dt=None, ntimestep=None,
-        runtime_plot=False, vmax=0.5):
+        runtime_plot=False, vmax=0.5, device='cpu'):
     """
     Run simulation.
     """
+    assert device in ['cpu', 'gpu'], 'device must be "cpu" or "gpu"'
+    if device == 'cpu':
+        # disable threading in jax
+        os.environ.update(
+            XLA_FLAGS=(
+                '--xla_cpu_multi_thread_eigen=false '
+                'intra_op_parallelism_threads=1 '
+                'inter_op_parallelism_threads=1 '
+                '--xla_force_host_platform_device_count=1'
+            ),
+        )
+        os.environ.update(JAX_PLATFORM_NAME='cpu')
 
-    # disable threading in jax
-    os.environ.update(
-        XLA_FLAGS=(
-            '--xla_cpu_multi_thread_eigen=false '
-            'intra_op_parallelism_threads=1 '
-            'inter_op_parallelism_threads=1 '
-            '--xla_force_host_platform_device_count=1'
-        ),
-    )
-    os.environ.update(JAX_PLATFORM_NAME='cpu')
+    from jax.lib import xla_bridge
+    jax_platform = xla_bridge.get_backend().platform
+    print(f'Using jax platform: {jax_platform}')
+
+    if device == 'gpu':
+        assert jax_platform == 'gpu', 'JAX could not find a GPU.'
 
     from jax.config import config
     # allow float64 dtype

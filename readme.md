@@ -22,7 +22,7 @@ The equations are marched in time with the explicit 3-stage, 3rd order Strong St
 
 ## Backends
 
-Currently numpy, numba, ramba, and jax backends are supported. Choose with the `-b` commandline argument.
+Currently `numpy`, `numba`, `ramba`, and `jax` backends are supported. Choose with the `-b` commandline argument. To use jax on GPUs, use `jax-gpu` backend.
 
 ## Example
 

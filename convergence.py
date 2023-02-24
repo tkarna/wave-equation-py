@@ -56,7 +56,7 @@ def run_convergence(n, dt, refinement_list, show_plot=False, **kwargs):
 
 @click.command()
 @click.option('-b', '--backend', default='numpy', show_default=True,
-              type=click.Choice(['numpy', 'ramba', 'numba', 'jax'],
+              type=click.Choice(['numpy', 'ramba', 'numba', 'jax', 'jax-gpu'],
                                 case_sensitive=False),
               help='Use given backend.')
 @click.option('-p', '--show-plot', is_flag=True, default=False,
