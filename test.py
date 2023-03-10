@@ -18,9 +18,9 @@ def exact_elev(grid, t):
     amp = 0.5
     c = math.sqrt(constant.g * constant.h)
     n = 1
-    sol_x = numpy.sin(2 * n * numpy.pi * grid.x_t_2d / grid.lx)
+    sol_x = numpy.cos(2 * n * numpy.pi * grid.x_t_2d / grid.lx)
     m = 1
-    sol_y = numpy.sin(2 * m * numpy.pi * grid.y_t_2d / grid.ly)
+    sol_y = numpy.cos(2 * m * numpy.pi * grid.y_t_2d / grid.ly)
     omega = c * numpy.pi * math.sqrt((n/grid.lx)**2 + (m/grid.ly)**2)
     sol_t = numpy.cos(2 * omega * t)
     return amp * sol_x * sol_y * sol_t

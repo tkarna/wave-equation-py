@@ -57,14 +57,10 @@ class CGrid:
         print(f'Total     DOFs: {self.dofs_T + self.dofs_U + self.dofs_V}')
 
 
-def run(nx, ny, initial_elev_func, exact_elev_func=None,
-        t_end=1.0, t_export=0.02, dt=None, ntimestep=None,
-        backend='numpy',
-        runtime_plot=False, vmax=0.5):
+def run(nx, ny, initial_elev_func, backend='numpy', **kwargs):
     """
     Run simulation.
     """
-    kwargs = {}
     if backend in ['numpy', 'ramba']:
         import core_numpy as core
         kwargs['backend'] = backend
@@ -80,10 +76,6 @@ def run(nx, ny, initial_elev_func, exact_elev_func=None,
     print(f'Using backend: {backend}')
     grid = CGrid(nx, ny)
 
-    out = core.run(
-        grid, initial_elev_func, exact_elev_func=exact_elev_func,
-        t_end=t_end, t_export=t_export, dt=dt, ntimestep=ntimestep,
-        runtime_plot=runtime_plot, vmax=vmax,
-        **kwargs
-    )
+    out = core.run(grid, initial_elev_func, **kwargs)
+
     return out
