@@ -8,6 +8,7 @@ import numpy
 def run(grid, initial_elev_func, exact_elev_func=None,
         t_end=1.0, t_export=0.02, dt=None, ntimestep=None,
         runtime_plot=False, vmax=0.5,
+        use_periodic_boundary=False,
         backend='numpy'):
     """
     Run simulation.
@@ -19,6 +20,7 @@ def run(grid, initial_elev_func, exact_elev_func=None,
     else:
         raise ValueError(f'Unknown backend "{backend}"')
 
+    # constants
     g = constant.g
     h = constant.h
 
@@ -69,11 +71,11 @@ def run(grid, initial_elev_func, exact_elev_func=None,
         dudt[1:-1, :] = -g * (elev[1:, :] - elev[:-1, :])/dx
         dvdt[:, 1:-1] = -g * (elev[:, 1:] - elev[:, :-1])/dy
 
-        # periodic boundary
-        dudt[0, :] = - g * (elev[0, :] - elev[-1, :])/dx
-        dudt[-1, :] = dudt[0, :]
-        dvdt[:, 0] = - g * (elev[:, 0] - elev[:, -1])/dy
-        dvdt[:, -1] = dvdt[:, 0]
+        if use_periodic_boundary:
+            dudt[0, :] = - g * (elev[0, :] - elev[-1, :])/dx
+            dudt[-1, :] = dudt[0, :]
+            dvdt[:, 0] = - g * (elev[:, 0] - elev[:, -1])/dy
+            dvdt[:, -1] = dvdt[:, 0]
 
         # velocity divergence -h div(u)
         delevdt[...] = -h * ((u[1:, :] - u[:-1, :])/dx +
@@ -110,8 +112,9 @@ def run(grid, initial_elev_func, exact_elev_func=None,
     if runtime_plot:
         plt.ion()
         fig, ax = plt.subplots(nrows=1, ncols=1)
+        cmap = plt.get_cmap('RdBu_r', 61)
         img = ax.pcolormesh(grid.x_u_1d, grid.y_v_1d, numpy.asarray(elev.T),
-                            vmin=-vmax, vmax=vmax, cmap='RdBu_r')
+                            vmin=-vmax, vmax=vmax, cmap=cmap)
         plt.colorbar(img, label='Elevation')
         fig.canvas.draw()
         fig.canvas.flush_events()
@@ -164,7 +167,7 @@ def run(grid, initial_elev_func, exact_elev_func=None,
         if exact_elev_func is not None:
             fig2, ax2 = plt.subplots(nrows=1, ncols=1)
             img2 = ax2.pcolormesh(grid.x_u_1d, grid.y_v_1d, elev_exact.T,
-                                  vmin=-vmax, vmax=vmax, cmap='RdBu_r')
+                                  vmin=-vmax, vmax=vmax, cmap=cmap)
             plt.colorbar(img2, label='Elevation')
             ax2.set_title('Exact')
 

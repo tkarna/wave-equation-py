@@ -8,7 +8,9 @@ import os
 
 def run(grid, initial_elev_func, exact_elev_func=None,
         t_end=1.0, t_export=0.02, dt=None, ntimestep=None,
-        runtime_plot=False, vmax=0.5, device='cpu'):
+        runtime_plot=False, vmax=0.5,
+        use_periodic_boundary=False,
+        device='cpu'):
     """
     Run simulation.
     """
@@ -38,6 +40,7 @@ def run(grid, initial_elev_func, exact_elev_func=None,
     import jax.numpy as npx
     from jax import jit
 
+    # constants
     g = constant.g
     h = constant.h
 
@@ -77,8 +80,8 @@ def run(grid, initial_elev_func, exact_elev_func=None,
     dx = grid.dx
     dy = grid.dy
 
-    @partial(jit, static_argnums=(6, 7, 8, 9))
-    def rhs(u, v, elev, dudt, dvdt, delevdt, g, h, dx, dy):
+    @partial(jit, static_argnums=(6, 7, 8, 9, 10))
+    def rhs(u, v, elev, dudt, dvdt, delevdt, g, h, dx, dy, use_periodic_boundary):
         """
         Evaluate right hand side of the equations
         """
@@ -89,11 +92,11 @@ def run(grid, initial_elev_func, exact_elev_func=None,
         dudt = dudt.at[1:-1, :].set(-g * (elev[1:, :] - elev[:-1, :])/dx)
         dvdt = dvdt.at[:, 1:-1].set(-g * (elev[:, 1:] - elev[:, :-1])/dy)
 
-        # periodic boundary
-        dudt = dudt.at[0, :].set(- g * (elev[0, :] - elev[-1, :])/dx)
-        dudt = dudt.at[-1, :].set(dudt[0, :])
-        dvdt = dvdt.at[:, 0].set(- g * (elev[:, 0] - elev[:, -1])/dy)
-        dvdt = dvdt.at[:, -1].set(dvdt[:, 0])
+        if use_periodic_boundary:
+            dudt = dudt.at[0, :].set(- g * (elev[0, :] - elev[-1, :])/dx)
+            dudt = dudt.at[-1, :].set(dudt[0, :])
+            dvdt = dvdt.at[:, 0].set(- g * (elev[:, 0] - elev[:, -1])/dy)
+            dvdt = dvdt.at[:, -1].set(dvdt[:, 0])
 
         # velocity divergence -h div(u)
         delevdt = delevdt.at[...].set(-h * ((u[1:, :] - u[:-1, :])/dx +
@@ -101,13 +104,13 @@ def run(grid, initial_elev_func, exact_elev_func=None,
 
         return dudt, dvdt, delevdt
 
-    @partial(jit, static_argnums=(12, 13, 14, 15, 16))
+    @partial(jit, static_argnums=(12, 13, 14, 15, 16, 17))
     def step(u, v, elev, u1, v1, elev1, u2, v2, elev2, dudt, dvdt, delevdt,
-             g, h, dt, dx, dy):
+             g, h, dt, dx, dy, use_periodic_boundary):
         """
         Execute one SSPRK(3,3) time step
         """
-        config = g, h, dx, dy
+        config = g, h, dx, dy, use_periodic_boundary
         dudt, dvdt, delevdt = rhs(u, v, elev,
                                   dudt, dvdt, delevdt, *config)
         u1 = u1.at[...].set(u + dt*dudt)
@@ -132,7 +135,7 @@ def run(grid, initial_elev_func, exact_elev_func=None,
     # aux time stepping fields
     state_args = u1, v1, elev1, u2, v2, elev2, dudt, dvdt, delevdt
     # constant args
-    config_args = g, h, dt, dx, dy
+    config_args = g, h, dt, dx, dy, use_periodic_boundary
     # warm jit cache
     step(u, v, elev, *state_args, *config_args)
 
@@ -144,8 +147,9 @@ def run(grid, initial_elev_func, exact_elev_func=None,
     if runtime_plot:
         plt.ion()
         fig, ax = plt.subplots(nrows=1, ncols=1)
+        cmap = plt.get_cmap('RdBu_r', 61)
         img = ax.pcolormesh(grid.x_u_1d, grid.y_v_1d, elev.T,
-                            vmin=-vmax, vmax=vmax, cmap='RdBu_r')
+                            vmin=-vmax, vmax=vmax, cmap=cmap)
         plt.colorbar(img, label='Elevation')
         fig.canvas.draw()
         fig.canvas.flush_events()
@@ -198,7 +202,7 @@ def run(grid, initial_elev_func, exact_elev_func=None,
         if exact_elev_func is not None:
             fig2, ax2 = plt.subplots(nrows=1, ncols=1)
             img2 = ax2.pcolormesh(grid.x_u_1d, grid.y_v_1d, elev_exact.T,
-                                  vmin=-vmax, vmax=vmax, cmap='RdBu_r')
+                                  vmin=-vmax, vmax=vmax, cmap=cmap)
             plt.colorbar(img2, label='Elevation')
             ax2.set_title('Exact')
 

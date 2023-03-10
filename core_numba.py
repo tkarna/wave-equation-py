@@ -10,10 +10,14 @@ use_threading = False
 
 def run(grid, initial_elev_func, exact_elev_func=None,
         t_end=1.0, t_export=0.02, dt=None, ntimestep=None,
-        runtime_plot=False, vmax=0.5):
+        runtime_plot=False, vmax=0.5,
+        use_periodic_boundary=False,
+        ):
     """
     Run simulation.
     """
+
+    # constants
     g = constant.g
     h = constant.h
 
@@ -54,7 +58,7 @@ def run(grid, initial_elev_func, exact_elev_func=None,
     dy = grid.dy
 
     @njit(fastmath=True, parallel=use_threading)
-    def rhs(u, v, elev, dudt, dvdt, delevdt):
+    def rhs(u, v, elev, dudt, dvdt, delevdt, use_periodic_boundary):
         """
         Evaluate right hand side of the equations
         """
@@ -65,38 +69,38 @@ def run(grid, initial_elev_func, exact_elev_func=None,
         dudt[1:-1, :] = -g * (elev[1:, :] - elev[:-1, :])/dx
         dvdt[:, 1:-1] = -g * (elev[:, 1:] - elev[:, :-1])/dy
 
-        # periodic boundary
-        dudt[0, :] = - g * (elev[0, :] - elev[-1, :])/dx
-        dudt[-1, :] = dudt[0, :]
-        dvdt[:, 0] = - g * (elev[:, 0] - elev[:, -1])/dy
-        dvdt[:, -1] = dvdt[:, 0]
+        if use_periodic_boundary:
+            dudt[0, :] = - g * (elev[0, :] - elev[-1, :])/dx
+            dudt[-1, :] = dudt[0, :]
+            dvdt[:, 0] = - g * (elev[:, 0] - elev[:, -1])/dy
+            dvdt[:, -1] = dvdt[:, 0]
 
         # velocity divergence -h div(u)
         delevdt[...] = -h * ((u[1:, :] - u[:-1, :])/dx +
                              (v[:, 1:] - v[:, :-1])/dy)
 
     @njit(fastmath=True, parallel=use_threading)
-    def step(u, v, elev, u1, v1, elev1, u2, v2, elev2, dudt, dvdt, delevdt):
+    def step(u, v, elev, u1, v1, elev1, u2, v2, elev2, dudt, dvdt, delevdt, use_periodic_boundary):
         """
         Execute one SSPRK(3,3) time step
         """
         one_third = 1./3
         two_thirds = 2./3
-        rhs(u, v, elev, dudt, dvdt, delevdt)
+        rhs(u, v, elev, dudt, dvdt, delevdt, use_periodic_boundary)
         u1[...] = u + dt*dudt
         v1[...] = v + dt*dvdt
         elev1[...] = elev + dt*delevdt
-        rhs(u1, v1, elev1, dudt, dvdt, delevdt)
+        rhs(u1, v1, elev1, dudt, dvdt, delevdt, use_periodic_boundary)
         u2[...] = 0.75*u + 0.25*(u1 + dt*dudt)
         v2[...] = 0.75*v + 0.25*(v1 + dt*dvdt)
         elev2[...] = 0.75*elev + 0.25*(elev1 + dt*delevdt)
-        rhs(u2, v2, elev2, dudt, dvdt, delevdt)
+        rhs(u2, v2, elev2, dudt, dvdt, delevdt, use_periodic_boundary)
         u[...] = one_third*u + two_thirds*(u2 + dt*dudt)
         v[...] = one_third*v + two_thirds*(v2 + dt*dvdt)
         elev[...] = one_third*elev + two_thirds*(elev2 + dt*delevdt)
 
     # warm jit cache
-    step(u, v, elev, u1, v1, elev1, u2, v2, elev2, dudt, dvdt, delevdt)
+    step(u, v, elev, u1, v1, elev1, u2, v2, elev2, dudt, dvdt, delevdt, use_periodic_boundary)
 
     # initial condition
     elev[...] = initial_elev_func(grid)
@@ -106,8 +110,9 @@ def run(grid, initial_elev_func, exact_elev_func=None,
     if runtime_plot:
         plt.ion()
         fig, ax = plt.subplots(nrows=1, ncols=1)
+        cmap = plt.get_cmap('RdBu_r', 61)
         img = ax.pcolormesh(grid.x_u_1d, grid.y_v_1d, elev.T,
-                            vmin=-vmax, vmax=vmax, cmap='RdBu_r')
+                            vmin=-vmax, vmax=vmax, cmap=cmap)
         plt.colorbar(img, label='Elevation')
         fig.canvas.draw()
         fig.canvas.flush_events()
@@ -142,7 +147,7 @@ def run(grid, initial_elev_func, exact_elev_func=None,
                 fig.canvas.draw()
                 fig.canvas.flush_events()
 
-        step(u, v, elev, u1, v1, elev1, u2, v2, elev2, dudt, dvdt, delevdt)
+        step(u, v, elev, u1, v1, elev1, u2, v2, elev2, dudt, dvdt, delevdt, use_periodic_boundary)
 
     duration = time_mod.perf_counter() - tic
     print(f'Duration: {duration:.2f} s')
@@ -160,7 +165,7 @@ def run(grid, initial_elev_func, exact_elev_func=None,
         if exact_elev_func is not None:
             fig2, ax2 = plt.subplots(nrows=1, ncols=1)
             img2 = ax2.pcolormesh(grid.x_u_1d, grid.y_v_1d, elev_exact.T,
-                                  vmin=-vmax, vmax=vmax, cmap='RdBu_r')
+                                  vmin=-vmax, vmax=vmax, cmap=cmap)
             plt.colorbar(img2, label='Elevation')
             ax2.set_title('Exact')
 
