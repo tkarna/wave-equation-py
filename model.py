@@ -78,4 +78,13 @@ def run(nx, ny, initial_elev_func, backend='numpy', **kwargs):
 
     out = core.run(grid, initial_elev_func, **kwargs)
 
+    l2_error = out[1]
+    if (nx < 128 or ny < 128):
+        print('Skipping correctness test due to small problem size.')
+    else:
+        tolerance = 1e-2
+        if l2_error > tolerance:
+            print(f'ERROR: L2 error exceeds tolerance: {l2_error} > {tolerance}')
+        else:
+            print('SUCCESS')
     return out
