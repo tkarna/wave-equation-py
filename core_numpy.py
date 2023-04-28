@@ -102,7 +102,11 @@ def run(grid, initial_elev_func, exact_elev_func=None,
 
     if backend == 'ramba':
         # warm jit cache
+        if backend == "ramba":
+            npx.sync()
         step(u, v, elev, u1, v1, elev1, u2, v2, elev2, dudt, dvdt, delevdt)
+        if backend == "ramba":
+            npx.sync()
 
     # initial condition
     elev[...] = npx.asarray(initial_elev_func(grid))
@@ -119,12 +123,17 @@ def run(grid, initial_elev_func, exact_elev_func=None,
         fig.canvas.draw()
         fig.canvas.flush_events()
 
+    if backend == "ramba":
+        npx.sync()
+
     t = 0
     i_export = 0
     next_t_export = 0
     initial_v = None
     tic = time_mod.perf_counter()
     for i in range(nt+1):
+        if backend == "ramba":
+            npx.sync()
 
         t = i*dt
 
@@ -148,8 +157,12 @@ def run(grid, initial_elev_func, exact_elev_func=None,
                 img.update({'array': numpy.asarray(elev.T)})
                 fig.canvas.draw()
                 fig.canvas.flush_events()
+            if backend == "ramba":
+                npx.sync()
 
         step(u, v, elev, u1, v1, elev1, u2, v2, elev2, dudt, dvdt, delevdt)
+        if backend == "ramba":
+            npx.sync()
 
     duration = time_mod.perf_counter() - tic
     print(f'Duration: {duration:.2f} s')
