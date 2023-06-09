@@ -12,6 +12,7 @@ def run(grid, initial_elev_func, exact_elev_func=None,
         t_end=1.0, t_export=0.02, dt=None, ntimestep=None,
         runtime_plot=False, vmax=0.5,
         use_periodic_boundary=False,
+        backend='numba'
         ):
     """
     Run simulation.
@@ -80,7 +81,7 @@ def run(grid, initial_elev_func, exact_elev_func=None,
                              (v[:, 1:] - v[:, :-1])/dy)
 
     @njit(fastmath=True, parallel=use_threading)
-    def step(u, v, elev, u1, v1, elev1, u2, v2, elev2, dudt, dvdt, delevdt, use_periodic_boundary):
+    def step_default(u, v, elev, u1, v1, elev1, u2, v2, elev2, dudt, dvdt, delevdt, use_periodic_boundary):
         """
         Execute one SSPRK(3,3) time step
         """
@@ -98,6 +99,117 @@ def run(grid, initial_elev_func, exact_elev_func=None,
         u[...] = one_third*u + two_thirds*(u2 + dt*dudt)
         v[...] = one_third*v + two_thirds*(v2 + dt*dvdt)
         elev[...] = one_third*elev + two_thirds*(elev2 + dt*delevdt)
+
+    @njit(fastmath=True, parallel=use_threading)
+    def stage1(u, v, elev, u1, v1, elev1, use_periodic_boundary):
+        """
+        Evaluate equations and update state variables for stage 1
+        """
+        # terms
+        # sign convention: positive on rhs
+        for i in range(elev.shape[0]-1):
+            for j in range(elev.shape[1]-1):
+                # pressure gradient -g grad(elev)
+                dedx = (-g * (elev[i+1, j] - elev[i, j])/dx)
+                u1[i+1, j] = u[i+1, j] + dt*dedx
+                dedy = (-g * (elev[i, j+1] - elev[i, j])/dy)
+                v1[i, j+1] = v[i, j+1] + dt*dedy
+                # velocity divergence -h div(u)
+                divuv = (-h * ((u[i+1, j] - u[i, j])/dx + (v[i, j+1] - v[i, j])/dy))
+                elev1[i, j] = elev[i, j] + dt*divuv
+            u1[i+1, -1] = u[i+1, -1] + dt*(-g * (elev[i+1, -1] - elev[i, -1])/dx)
+            elev1[i, -1] = elev[i, -1] + dt*(-h * ((u[i+1, -1] - u[i, -1])/dx + (v[i, -1] - v[i, -2])/dy))
+
+        v1[-1, 1:-1] = v[-1, 1:-1] + dt*(-g * (elev[-1, 1:] - elev[-1, :-1])/dy)
+        elev1[-1, :] = elev[-1, :] + dt*(-h * ((u[-1, :] - u[-2, :])/dx + (v[-1, 1:] - v[-1, :-1])/dy))
+
+        if use_periodic_boundary:
+            dedx = - g * (elev[0, :] - elev[-1, :])/dx
+            u1[0, :] = u[0, :] + dt*dedx
+            u1[-1, :] = u[-1, :] + dt*dedx
+            dedy = - g * (elev[:, 0] - elev[:, -1])/dy
+            v1[:, 0] = v[:, 0] + dt*dedy
+            v1[:, -1] = v[:, -1] + dt*dedy
+
+    @njit(fastmath=True, parallel=use_threading)
+    def stage2(u, v, elev, u1, v1, elev1, u2, v2, elev2, use_periodic_boundary):
+        """
+        Evaluate equations and update state variables for stage 2
+        """
+        # terms
+        # sign convention: positive on rhs
+        for i in range(elev.shape[0]-1):
+            for j in range(elev.shape[1]-1):
+                # pressure gradient -g grad(elev)
+                dedx = (-g * (elev1[i+1, j] - elev1[i, j])/dx)
+                u2[i+1, j] = 0.75*u[i+1, j] + 0.25*(u1[i+1, j] + dt*dedx)
+                dedy = (-g * (elev1[i, j+1] - elev1[i, j])/dy)
+                v2[i, j+1] = 0.75*v[i, j+1] + 0.25*(v1[i, j+1] + dt*dedy)
+                # velocity divergence -h div(u)
+                divuv = (-h * ((u1[i+1, j] - u1[i, j])/dx + (v1[i, j+1] - v1[i, j])/dy))
+                elev2[i, j] = 0.75*elev[i, j] + 0.25*(elev1[i, j] + dt*divuv)
+            u2[i+1, -1] = 0.75*u[i+1, -1] + 0.25*(u1[i+1, -1] + dt*(-g * (elev1[i+1, -1] - elev1[i, -1])/dx))
+            elev2[i, -1] = 0.75*elev[i, -1] + 0.25*(elev1[i, -1] + dt*(-h * ((u1[i+1, -1] - u1[i, -1])/dx + (v1[i, -1] - v1[i, -2])/dy)))
+
+        v2[-1, 1:-1] = 0.75*v[-1, 1:-1] + 0.25*(v1[-1, 1:-1] + dt*(-g * (elev1[-1, 1:] - elev1[-1, :-1])/dy))
+        elev2[-1, :] = 0.75*elev[-1, :] + 0.25*(elev1[-1, :] + dt*(-h * ((u1[-1, :] - u1[-2, :])/dx + (v1[-1, 1:] - v1[-1, :-1])/dy)))
+
+        if use_periodic_boundary:
+            dedx = - g * (elev1[0, :] - elev1[-1, :])/dx
+            u2[0, :] = 0.75*u[0, :] + 0.25*(u1[0, :] + dt*dedx)
+            u2[-1, :] = 0.75*u[-1, :] + 0.25*(u1[-1, :] + dt*dedx)
+            dedy = - g * (elev1[:, 0] - elev1[:, -1])/dy
+            v2[:, 0] = 0.75*v[:, 0] + 0.25*(v1[:, 0] + dt*dedy)
+            v2[:, -1] = 0.75*v[:, -1] + 0.25*(v1[:, -1] + dt*dedy)
+
+    @njit(fastmath=True, parallel=use_threading)
+    def stage3(u, v, elev, u2, v2, elev2, use_periodic_boundary):
+        """
+        Evaluate equations and update state variables for stage 3
+        """
+        # terms
+        # sign convention: positive on rhs
+
+        one_third = 1./3
+        two_thirds = 2./3
+        # pressure gradient -g grad(elev)
+        for i in range(elev.shape[0]-1):
+            for j in range(elev.shape[1]-1):
+                dedx = (-g * (elev2[i+1, j] - elev2[i, j])/dx)
+                u[i+1, j] = one_third*u[i+1, j] + two_thirds*(u2[i+1, j] + dt*dedx)
+                dedy = (-g * (elev2[i, j+1] - elev2[i, j])/dy)
+                v[i, j+1] = one_third*v[i, j+1] + two_thirds*(v2[i, j+1] + dt*dedy)
+                divuv = (-h * ((u2[i+1, j] - u2[i, j])/dx + (v2[i, j+1] - v2[i, j])/dy))
+                elev[i, j] = one_third*elev[i, j] + two_thirds*(elev2[i, j] + dt*divuv)
+            u[i+1, -1] = one_third*u[i+1, -1] + two_thirds*(u2[i+1, -1] + dt*(-g * (elev2[i+1, -1] - elev2[i, -1])/dx))
+            elev[i, -1] = one_third*elev[i, -1] + two_thirds*(elev2[i, -1] + dt*(-h * ((u2[i+1, -1] - u2[i, -1])/dx + (v2[i, -1] - v2[i, -2])/dy)))
+
+        v[-1, 1:-1] = one_third*v[-1, 1:-1] + two_thirds*(v2[-1, 1:-1] + dt*(-g * (elev2[-1, 1:] - elev2[-1, :-1])/dy))
+        elev[-1, :] = one_third*elev[-1, :] + two_thirds*(elev2[-1, :] + dt*(-h * ((u2[-1, :] - u2[-2, :])/dx + (v2[-1, 1:] - v2[-1, :-1])/dy)))
+
+        if use_periodic_boundary:
+            dedx = - g * (elev2[0, :] - elev2[-1, :])/dx
+            u[0, :] = one_third*u[0, :] + two_thirds*(u2[0, :] + dt*dedx)
+            u[-1, :] = one_third*u[-1, :] +  two_thirds*(u2[-1, :] + dt*dedx)
+            dedy = - g * (elev2[:, 0] - elev2[:, -1])/dy
+            v[:, 0] = one_third*v[:, 0] + two_thirds*(v2[:, 0] + dt*dedy)
+            v[:, -1] = one_third*v[:, -1] +  two_thirds*(v2[:, -1] + dt*dedy)
+
+    @njit(fastmath=True, parallel=use_threading)
+    def step_opt(u, v, elev, u1, v1, elev1, u2, v2, elev2, dudt, dvdt, delevdt, use_periodic_boundary):
+        """
+        Execute one SSPRK(3,3) time step
+        """
+        stage1(u, v, elev, u1, v1, elev1, use_periodic_boundary)
+        stage2(u, v, elev, u1, v1, elev1, u2, v2, elev2, use_periodic_boundary)
+        stage3(u, v, elev, u2, v2, elev2, use_periodic_boundary)
+
+    if backend == 'numba':
+        step = step_default
+    elif backend == 'numba-opt':
+        step = step_opt
+    else:
+        raise ValueError(f'Unknown backend: {backend}')
 
     # warm jit cache
     step(u, v, elev, u1, v1, elev1, u2, v2, elev2, dudt, dvdt, delevdt, use_periodic_boundary)

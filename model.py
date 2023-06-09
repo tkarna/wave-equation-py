@@ -64,8 +64,9 @@ def run(nx, ny, initial_elev_func, backend='numpy', **kwargs):
     if backend in ['numpy', 'ramba']:
         import core_numpy as core
         kwargs['backend'] = backend
-    elif backend == 'numba':
+    elif backend in ['numba', 'numba-opt']:
         import core_numba as core
+        kwargs['backend'] = backend
     elif backend in ['jax', 'jax-gpu']:
         device = 'gpu' if backend == 'jax-gpu' else 'cpu'
         import core_jax as core
