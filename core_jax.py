@@ -58,11 +58,6 @@ def run(grid, initial_elev_func, exact_elev_func=None,
     v1 = npx.zeros_like(v)
     v2 = npx.zeros_like(v)
 
-    # tendecies u += dt*dudt
-    dudt = npx.zeros_like(u)
-    dvdt = npx.zeros_like(v)
-    delevdt = npx.zeros_like(elev)
-
     # time step
     if dt is None:
         c = math.sqrt(g*h)
@@ -80,8 +75,8 @@ def run(grid, initial_elev_func, exact_elev_func=None,
     dx = grid.dx
     dy = grid.dy
 
-    @partial(jit, static_argnums=(6, 7, 8, 9, 10))
-    def rhs(u, v, elev, dudt, dvdt, delevdt, g, h, dx, dy, use_periodic_boundary):
+    @partial(jit, static_argnums=(3, 4, 5, 6, 7))
+    def rhs(u, v, elev, g, h, dx, dy, use_periodic_boundary):
         """
         Evaluate right hand side of the equations
         """
@@ -89,6 +84,8 @@ def run(grid, initial_elev_func, exact_elev_func=None,
         # sign convention: positive on rhs
 
         # pressure gradient -g grad(elev)
+        dudt = npx.zeros_like(u)
+        dvdt = npx.zeros_like(v)
         dudt = dudt.at[1:-1, :].set(-g * (elev[1:, :] - elev[:-1, :])/dx)
         dvdt = dvdt.at[:, 1:-1].set(-g * (elev[:, 1:] - elev[:, :-1])/dy)
 
@@ -99,30 +96,26 @@ def run(grid, initial_elev_func, exact_elev_func=None,
             dvdt = dvdt.at[:, -1].set(dvdt[:, 0])
 
         # velocity divergence -h div(u)
-        delevdt = delevdt.at[...].set(-h * ((u[1:, :] - u[:-1, :])/dx +
-                                            (v[:, 1:] - v[:, :-1])/dy))
+        delevdt = -h * ((u[1:, :] - u[:-1, :])/dx + (v[:, 1:] - v[:, :-1])/dy)
 
         return dudt, dvdt, delevdt
 
-    @partial(jit, static_argnums=(12, 13, 14, 15, 16, 17))
-    def step(u, v, elev, u1, v1, elev1, u2, v2, elev2, dudt, dvdt, delevdt,
+    @partial(jit, static_argnums=(9, 10, 11, 12, 13, 14))
+    def step(u, v, elev, u1, v1, elev1, u2, v2, elev2,
              g, h, dt, dx, dy, use_periodic_boundary):
         """
         Execute one SSPRK(3,3) time step
         """
         config = g, h, dx, dy, use_periodic_boundary
-        dudt, dvdt, delevdt = rhs(u, v, elev,
-                                  dudt, dvdt, delevdt, *config)
+        dudt, dvdt, delevdt = rhs(u, v, elev, *config)
         u1 = u1.at[...].set(u + dt*dudt)
         v1 = v1.at[...].set(v + dt*dvdt)
         elev1 = elev1.at[...].set(elev + dt*delevdt)
-        dudt, dvdt, delevdt = rhs(u1, v1, elev1,
-                                  dudt, dvdt, delevdt, *config)
+        dudt, dvdt, delevdt = rhs(u1, v1, elev1, *config)
         u2 = u2.at[...].set(0.75*u + 0.25*(u1 + dt*dudt))
         v2 = v2.at[...].set(0.75*v + 0.25*(v1 + dt*dvdt))
         elev2 = elev2.at[...].set(0.75*elev + 0.25*(elev1 + dt*delevdt))
-        dudt, dvdt, delevdt = rhs(u2, v2, elev2,
-                                  dudt, dvdt, delevdt, *config)
+        dudt, dvdt, delevdt = rhs(u2, v2, elev2, *config)
         u = u.at[...].multiply(1./3)
         v = v.at[...].multiply(1./3)
         elev = elev.at[...].multiply(1./3)
@@ -133,7 +126,7 @@ def run(grid, initial_elev_func, exact_elev_func=None,
         return u, v, elev
 
     # aux time stepping fields
-    state_args = u1, v1, elev1, u2, v2, elev2, dudt, dvdt, delevdt
+    state_args = u1, v1, elev1, u2, v2, elev2
     # constant args
     config_args = g, h, dt, dx, dy, use_periodic_boundary
     # warm jit cache
