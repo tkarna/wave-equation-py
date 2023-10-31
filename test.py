@@ -39,6 +39,9 @@ def initial_elev(grid):
 @click.option('-n', '--resolution', default=128,
               type=click.IntRange(min=4, max_open=True), show_default=True,
               help='Number of grid cells in x and y direction.')
+@click.option('-dtype', '--datatype', default='f64',
+              type=click.Choice(['f64', 'f32']), show_default=True,
+              help='Datatype for model state variables.')
 @click.option('-p', '--runtime-plot', is_flag=True, default=False,
               type=click.BOOL, show_default=True,
               help='Plot solution at runtime.')

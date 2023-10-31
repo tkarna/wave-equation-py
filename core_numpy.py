@@ -9,7 +9,7 @@ def run(grid, initial_elev_func, exact_elev_func=None,
         t_end=1.0, t_export=0.02, dt=None, ntimestep=None,
         runtime_plot=False, vmax=0.5,
         use_periodic_boundary=False,
-        backend='numpy'):
+        backend='numpy', datatype='f64'):
     """
     Run simulation.
     """
@@ -20,12 +20,16 @@ def run(grid, initial_elev_func, exact_elev_func=None,
     else:
         raise ValueError(f'Unknown backend "{backend}"')
 
+    dtype = {
+        "f64": npx.float64,
+        "f32": npx.float32,
+    }[datatype]
+
     # constants
     g = constant.g
     h = constant.h
 
     # state variables
-    dtype = npx.float64
     elev = npx.zeros(grid.T_shape, dtype=dtype)
     u = npx.zeros(grid.U_shape, dtype=dtype)
     v = npx.zeros(grid.V_shape, dtype=dtype)

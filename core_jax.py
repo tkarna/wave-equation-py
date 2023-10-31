@@ -9,7 +9,7 @@ import os
 def run(grid, initial_elev_func, exact_elev_func=None,
         t_end=1.0, t_export=0.02, dt=None, ntimestep=None,
         runtime_plot=False, vmax=0.5,
-        use_periodic_boundary=False,
+        use_periodic_boundary=False, datatype='f64',
         device='cpu'):
     """
     Run simulation.
@@ -35,17 +35,22 @@ def run(grid, initial_elev_func, exact_elev_func=None,
         assert jax_platform == 'gpu', 'JAX could not find a GPU.'
 
     from jax.config import config
-    # allow float64 dtype
-    config.update('jax_enable_x64', True)
+    if datatype == 'f64':
+        # allow float64 dtype
+        config.update('jax_enable_x64', True)
     import jax.numpy as npx
     from jax import jit
+
+    dtype = {
+        "f64": npx.float64,
+        "f32": npx.float32,
+    }[datatype]
 
     # constants
     g = constant.g
     h = constant.h
 
     # state variables
-    dtype = npx.float64
     elev = npx.zeros(grid.T_shape, dtype=dtype)
     u = npx.zeros(grid.U_shape, dtype=dtype)
     v = npx.zeros(grid.V_shape, dtype=dtype)

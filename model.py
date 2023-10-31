@@ -76,6 +76,8 @@ def run(nx, ny, initial_elev_func, backend='numpy', **kwargs):
 
     print(f'Using backend: {backend}')
     grid = CGrid(nx, ny)
+    datatype = kwargs['datatype']
+    print(f'Datatype: {datatype}')
 
     out = core.run(grid, initial_elev_func, **kwargs)
 

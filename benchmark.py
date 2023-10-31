@@ -16,6 +16,9 @@ from test import initial_elev, exact_elev
               multiple=True,
               type=click.IntRange(min=4, max_open=True), show_default=True,
               help='Number of grid cells in x and y direction.')
+@click.option('-dtype', '--datatype', default='f64',
+              type=click.Choice(['f64', 'f32']), show_default=True,
+              help='Datatype for model state variables.')
 @click.option('-p', '--generate-plot', is_flag=True, default=False,
               type=click.BOOL, show_default=True,
               help='Generate a plot of timings.')
@@ -39,7 +42,7 @@ def main(**kwargs):
                 initial_elev_func=initial_elev,
                 exact_elev_func=exact_elev,
                 dt=dt, ntimestep=ntimestep, t_export=t_export,
-                backend=b,
+                backend=b, datatype=kwargs['datatype']
             )
             timings[(b, r)] = t/ntimestep*1000.
 

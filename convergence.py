@@ -59,6 +59,9 @@ def run_convergence(n, dt, refinement_list, show_plot=False, **kwargs):
               type=click.Choice(['numpy', 'ramba', 'numba', 'jax', 'jax-gpu'],
                                 case_sensitive=False),
               help='Use given backend.')
+@click.option('-dtype', '--datatype', default='f64',
+              type=click.Choice(['f64', 'f32']), show_default=True,
+              help='Datatype for model state variables.')
 @click.option('-p', '--show-plot', is_flag=True, default=False,
               type=click.BOOL, show_default=True,
               help='Show convergence plot in the end.')
